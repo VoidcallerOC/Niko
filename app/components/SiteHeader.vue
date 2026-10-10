@@ -48,7 +48,7 @@ onMounted(() => {
 <template>
   <header class="sticky top-0 z-40 border-b border-white/10 bg-nc-ink/95 text-white backdrop-blur">
     <div class="wrap flex h-16 items-center justify-between gap-3">
-      <a href="#top" class="min-w-0 rounded-md" aria-label="Nino’s Collectibles, back to top">
+      <a href="/#top" class="min-w-0 rounded-md" aria-label="Nino’s Collectibles home">
         <BrandMark />
       </a>
 

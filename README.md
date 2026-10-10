@@ -38,6 +38,30 @@ section from a saved `TreasureResult` instead of calling OnTreasure. Never set i
 - Both fonts are self-hosted from npm (`@fontsource/barlow-condensed`, `@fontsource-variable/inter`), so the page makes no font requests to Google.
 - The type scale is defined as `@theme` tokens in `app/assets/css/main.css`: `text-hero`, `text-title`, `text-subtitle`, `text-lede` and `text-caption`.
 
+## Scan a card (`/scan`, public)
+
+A public page where customers, and Nino at shows, scan or search a card, pick its condition and see an
+estimated offer: **60%** of the current JustTCG market price (`NUXT_PUBLIC_BUY_RATE`), in whole cents.
+Cards can be added to a running list ("Cards in this visit") with a total. No sign-in, no saving, no admin.
+
+- **Forked from the TCG Buy Calculator** (`VoidcallerOC/tcg-buy-calculator@e46d63f`). The camera, image prep,
+  OCR, card reading, matching and correction code is copied into `app/lib/scanner/` (a fork note on line 1; only the
+  OCR asset path differs), the offer and list maths into `app/lib/pricing/`, and the engine into
+  `public/scanner/tesseract/` (Tesseract.js 7, Apache-2.0, ~8.7 MB, loaded on the first capture). The UI is
+  this site's own (`app/pages/scan.vue`, `app/components/scan/ScanCamera.vue`).
+- **Photos never leave the phone.** OCR runs in the browser; only the text read is sent, as a search.
+- **Card search + prices:** `server/api/cards.get.ts` → `server/utils/justtcg.ts` (port of the calculator's
+  `api/cards.js`). Needs **`JUSTTCG_API_KEY` set on this Vercel project**; without it the page says live
+  pricing isn't set up and estimates nothing. Cross-site requests are refused (JustTCG terms forbid
+  re-exposing their data). At most 4 provider requests per search; identical searches are CDN-cached 5 min.
+- **Never invented:** a scan is only text until the customer taps "Use this card"; two printings with one
+  number always ask; prices that are missing, undated or older than 7 days give no estimate, and such
+  cards are listed as "In person" and left out of the total. Condition is chosen by the customer, never
+  judged from the photo.
+- Tests: `npm test` (normalisation, search limits, offer maths, freshness) and
+  `npm run build && npm run test:e2e:scan` (real OCR on a fake camera; needs Playwright: set
+  `PLAYWRIGHT_MODULE` / `CHROMIUM` if it isn't installed).
+
 ## Upcoming shows (OnTreasure)
 
 `server/utils/treasureShows.ts` is adapted from Thousand Sunny's `src/lib/treasure-shows.ts`: it reads

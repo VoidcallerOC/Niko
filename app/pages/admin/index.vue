@@ -30,8 +30,12 @@ const tiles = computed(() => {
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <AdminButton to="/admin/scan" variant="red" size="lg" block>Scan a card</AdminButton>
       <AdminButton to="/admin/inventory/new" variant="white" size="lg" block>Add a listing</AdminButton>
-      <AdminButton to="/admin/inventory?filter=listed" variant="outline" size="lg" block>Change quantity / mark sold</AdminButton>
-      <AdminButton to="/admin/events" variant="outline" size="lg" block>Update an event</AdminButton>
+      <AdminButton to="/admin/inventory?filter=listed" variant="outline" size="lg" block>
+        <span class="sm:hidden">Mark sold</span><span class="hidden sm:inline">Change quantity / mark sold</span>
+      </AdminButton>
+      <AdminButton to="/admin/events" variant="outline" size="lg" block>
+        <span class="sm:hidden">Events</span><span class="hidden sm:inline">Update an event</span>
+      </AdminButton>
     </div>
 
     <p v-if="error" class="mt-6 text-nc-red-bright">Couldn’t load the dashboard: {{ errorMessage(error) }}</p>

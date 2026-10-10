@@ -26,6 +26,34 @@ const quick = [
   { to: '/admin/events', label: 'Events', icon: 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4' },
 ]
 const active = (to: string, exact = false) => (exact ? route.path === to : route.path === to || route.path.startsWith(to + '/'))
+// Bottom bar: "Cards" covers the inventory list and card pages, but not "Add".
+const quickActive = (to: string) =>
+  to === '/admin/inventory' ? active(to) && route.path !== '/admin/inventory/new' : active(to, true)
+
+// On phones the section tabs scroll sideways: keep the current one in view,
+// and fade whichever edge has more tabs past it.
+const tabs = ref<HTMLElement | null>(null)
+const more = reactive({ left: false, right: false })
+function edges() {
+  const el = tabs.value
+  if (!el) return
+  more.left = el.scrollLeft > 4
+  more.right = el.scrollLeft + el.clientWidth < el.scrollWidth - 4
+}
+function revealActive(smooth: boolean) {
+  const el = tabs.value
+  const cur = el?.querySelector<HTMLElement>('[aria-current="page"]')
+  if (!el || !cur) return edges()
+  const target = cur.offsetLeft - (el.clientWidth - cur.offsetWidth) / 2
+  el.scrollTo({ left: Math.max(0, target), behavior: smooth ? 'smooth' : 'auto' })
+  edges()
+}
+onMounted(() => {
+  revealActive(false)
+  window.addEventListener('resize', edges, { passive: true })
+})
+onBeforeUnmount(() => window.removeEventListener('resize', edges))
+watch(() => route.path, () => nextTick(() => revealActive(true)))
 
 const { data: session } = await useAdminSession()
 
@@ -53,18 +81,25 @@ useHead({ title: 'Admin — Nino’s Collectibles', meta: [{ name: 'robots', con
           <button type="button" class="nav-link whitespace-nowrap" @click="signOut">Sign out</button>
         </div>
       </div>
-      <nav aria-label="Admin sections" class="wrap -mb-px overflow-x-auto [scrollbar-width:none]">
-        <ul class="flex gap-1 whitespace-nowrap">
-          <li v-for="s in sections" :key="s.to">
-            <NuxtLink
-              :to="s.to"
-              class="inline-flex min-h-11 items-center border-b-2 px-3 text-[0.9375rem] font-medium"
-              :class="active(s.to, s.exact) ? 'border-nc-red text-white' : 'border-transparent text-white/60 hover:text-white'"
-              :aria-current="active(s.to, s.exact) ? 'page' : undefined"
-            >{{ s.label }}</NuxtLink>
-          </li>
-        </ul>
-      </nav>
+      <div class="relative">
+        <nav ref="tabs" aria-label="Admin sections" class="wrap relative -mb-px overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" @scroll.passive="edges">
+          <ul class="flex gap-1 whitespace-nowrap">
+            <li v-for="s in sections" :key="s.to">
+              <NuxtLink
+                :to="s.to"
+                class="inline-flex min-h-11 items-center border-b-2 px-3 text-[0.9375rem] font-medium"
+                :class="active(s.to, s.exact) ? 'border-nc-red text-white' : 'border-transparent text-white/60 hover:text-white'"
+                :aria-current="active(s.to, s.exact) ? 'page' : undefined"
+              >{{ s.label }}</NuxtLink>
+            </li>
+            <li class="sm:hidden">
+              <NuxtLink to="/" class="inline-flex min-h-11 items-center border-b-2 border-transparent px-3 text-[0.9375rem] font-medium text-white/60 hover:text-white">View site</NuxtLink>
+            </li>
+          </ul>
+        </nav>
+        <span aria-hidden="true" class="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-nc-ink to-transparent transition-opacity" :class="more.left ? 'opacity-100' : 'opacity-0'" />
+        <span aria-hidden="true" class="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-nc-ink to-transparent transition-opacity" :class="more.right ? 'opacity-100' : 'opacity-0'" />
+      </div>
     </header>
 
     <main id="admin-main" tabindex="-1" class="wrap pt-6 pb-28 sm:pb-16">
@@ -78,7 +113,8 @@ useHead({ title: 'Admin — Nino’s Collectibles', meta: [{ name: 'robots', con
     <nav aria-label="Quick actions" class="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-nc-ink/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
       <ul class="grid grid-cols-4">
         <li v-for="q in quick" :key="q.to">
-          <NuxtLink :to="q.to" class="flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-semibold" :class="active(q.to, true) ? 'text-nc-red-bright' : 'text-white/75'">
+          <NuxtLink :to="q.to" class="flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-semibold" :class="quickActive(q.to) ? 'text-nc-red-bright' : 'text-white/75'"
+            :aria-current="quickActive(q.to) ? 'page' : undefined">
             <svg aria-hidden="true" viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="q.icon" /></svg>
             {{ q.label }}
           </NuxtLink>

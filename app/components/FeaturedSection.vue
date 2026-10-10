@@ -30,7 +30,11 @@ const price = (c: number | null) => (c === null ? 'Ask' : (c / 100).toLocaleStri
               <span v-if="c.grade">{{ c.grade }}</span>
               <span v-else-if="c.condition">{{ c.condition }}</span>
             </span>
-            <LinkButton to="instagram" size="md" block class="mt-3">Ask about this card</LinkButton>
+            <div class="mt-auto pt-3">
+              <LinkButton to="instagram" size="md" block>
+                <span class="whitespace-nowrap sm:hidden">Ask<span class="sr-only"> about {{ c.title }}</span></span><span class="hidden sm:inline">Ask about this card</span>
+              </LinkButton>
+            </div>
           </div>
         </li>
       </ul>

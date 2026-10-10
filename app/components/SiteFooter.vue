@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { navLinks, site } from '~/data/site'
+
+// The stock note follows the feed: Square inventory once connected, past posts otherwise.
+const { data: squareFeed } = await useSquareFeed()
+const fromSquare = computed(() => squareFeed.value.cards.length > 0)
 </script>
 
 <template>
@@ -26,8 +30,14 @@ import { navLinks, site } from '~/data/site'
     </div>
     <div class="border-t border-white/10">
       <p class="wrap py-5 text-caption text-white/45">
-        Concept preview. Photos and captions are from {{ site.handle }}’s public Instagram posts; cards
-        shown are from past posts and are not a list of current stock. Not affiliated with Instagram,
+        <template v-if="fromSquare">
+          Concept preview. Cards in the feed come from Nino’s Square inventory; photos and captions in the
+          Instagram posts are from {{ site.handle }}’s public posts. Not affiliated with Instagram, Square,
+        </template>
+        <template v-else>
+          Concept preview. Photos and captions are from {{ site.handle }}’s public Instagram posts; cards
+          shown are from past posts and are not a list of current stock. Not affiliated with Instagram,
+        </template>
         Whatnot, OnTreasure, The Pokémon Company, Bandai or Shueisha.
       </p>
     </div>

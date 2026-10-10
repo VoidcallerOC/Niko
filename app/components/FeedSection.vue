@@ -57,7 +57,7 @@ const price = (cents: number | null, currency: string) =>
             </span>
             <div class="mt-auto pt-3">
               <LinkButton to="instagram" size="md" block>
-                <span class="sm:hidden">Ask Nino</span><span class="hidden sm:inline">Ask about this card</span>
+                <span class="whitespace-nowrap sm:hidden">Ask<span class="sr-only"> about {{ c.name }}</span></span><span class="hidden sm:inline">Ask about this card</span>
               </LinkButton>
             </div>
           </div>

@@ -176,7 +176,7 @@ useHead(() => ({
       </div>
 
       <p class="mt-4 text-caption text-nc-mist">
-        Dates and locations come from<template v-if="manual.length"> Nino and</template>
+        Dates and locations come from<template v-if="manual.length"> Nino and</template>{{ ' ' }}
         <a :href="links.onTreasureUrl" target="_blank" rel="noopener noreferrer" class="py-3.5 underline underline-offset-2 hover:text-white">Nino’s OnTreasure profile<span class="sr-only"> (opens in a new tab)</span></a>.
       </p>
 

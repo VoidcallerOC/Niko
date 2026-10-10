@@ -12,6 +12,8 @@ export interface OwnerAccount {
   email: string
   passwordHash: string
   merchantId: string
+  /** Square environment the merchant link belongs to (production | sandbox). */
+  squareEnv?: 'production' | 'sandbox'
   businessName: string
   createdAt: string
   sessionVersion: number
@@ -47,20 +49,30 @@ export const MIN_PASSWORD = 12
  *            yet, or the same merchant reconnects. A different merchant must
  *            disconnect the current one first.
  *  signin  → nobody is signed in. Allowed only for the merchant the owner
- *            already linked, and (when both sides know one) the same email.
+ *            already linked in the current Square environment.
  */
+/** The owner's merchant link for this Square environment, or '' (a Sandbox link never counts in Production). */
+export function linkedMerchant(owner: Pick<OwnerAccount, 'merchantId' | 'squareEnv'> | null, env: 'production' | 'sandbox') {
+  if (!owner?.merchantId) return ''
+  return (owner.squareEnv ?? 'production') === env ? owner.merchantId : ''
+}
+
 export function checkSquareAccess(
-  owner: Pick<OwnerAccount, 'merchantId' | 'email'> | null,
+  owner: Pick<OwnerAccount, 'merchantId' | 'email' | 'squareEnv'> | null,
   identity: { merchantId: string; email: string },
   intent: 'connect' | 'signin',
+  env: 'production' | 'sandbox' = 'production',
 ): { ok: true } | { ok: false; code: string } {
   if (!owner) return { ok: false, code: 'noowner' }
+  const linked = linkedMerchant(owner, env)
   if (intent === 'connect') {
-    if (owner.merchantId && owner.merchantId !== identity.merchantId) return { ok: false, code: 'othermerchant' }
+    // The first merchant authorized in this environment becomes the owner's Square account.
+    if (linked && linked !== identity.merchantId) return { ok: false, code: 'othermerchant' }
     return { ok: true }
   }
-  if (!owner.merchantId) return { ok: false, code: 'nosquare' }
-  if (owner.merchantId !== identity.merchantId) return { ok: false, code: 'notowner' }
-  if (owner.email && identity.email && owner.email.toLowerCase() !== identity.email.toLowerCase()) return { ok: false, code: 'notowner' }
+  if (!linked) return { ok: false, code: 'nosquare' }
+  // The merchant id is the binding: it was linked by the signed-in owner, so his
+  // Square email may differ from the email he chose for the admin.
+  if (linked !== identity.merchantId) return { ok: false, code: 'notowner' }
   return { ok: true }
 }

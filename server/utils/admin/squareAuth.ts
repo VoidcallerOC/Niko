@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 import type { H3Event } from 'h3'
-import { envSessionSecret, isDemoEnv } from './runtime'
+import { envSessionSecret, isDemoEnv, onVercel } from './runtime'
 
 /**
  * Square OAuth (official): https://developer.squareup.com/docs/oauth-api/overview
@@ -20,9 +20,15 @@ import { envSessionSecret, isDemoEnv } from './runtime'
  * Demo mode never contacts Square: a labelled SAMPLE identity stands in.
  *
  * Env: NUXT_SQUARE_APP_ID, NUXT_SQUARE_APP_SECRET, NUXT_SQUARE_ENV
- * (sandbox|production), NUXT_SESSION_SECRET, optional NUXT_SQUARE_REDIRECT_URL.
- * NUXT_SQUARE_API_ORIGIN / NUXT_SQUARE_AUTHORIZE_URL exist only so the flow
- * can be tested against a local mock; leave them unset on Vercel.
+ * (production | sandbox, required, no default), NUXT_SESSION_SECRET, and
+ * NUXT_SQUARE_REDIRECT_URL (the exact callback URL registered with Square).
+ *
+ * Sandbox and Production are separate: different Square credentials,
+ * different hosts, and a merchant linked in one environment is never treated
+ * as linked in the other, so a Sandbox test can't block Nino's real store.
+ *
+ * NUXT_SQUARE_API_ORIGIN / NUXT_SQUARE_AUTHORIZE_URL point the flow at a local
+ * mock for tests. They are ignored on Vercel.
  */
 
 export const SQUARE_SCOPES = ['MERCHANT_PROFILE_READ', 'EMPLOYEES_READ', 'ITEMS_READ', 'ITEMS_WRITE', 'INVENTORY_READ', 'INVENTORY_WRITE']
@@ -38,9 +44,13 @@ export interface SquareIdentity {
   source: 'square' | 'demo'
 }
 
+export type SquareEnv = 'production' | 'sandbox'
+
 export interface SquareConnection {
   /** Sealed access + refresh tokens (see seal/unseal). Empty for demo. */
   sealed: string
+  /** Which Square environment issued these tokens. */
+  env?: SquareEnv
   expiresAt: string
   merchantId: string
   businessName: string
@@ -56,27 +66,74 @@ interface Tokens {
   refreshToken: string
 }
 
+// Square's documented OAuth hosts (developer.squareup.com/docs/oauth-api).
+const HOSTS = {
+  production: { api: 'https://connect.squareup.com', authorize: 'https://connect.squareup.com/oauth2/authorize' },
+  sandbox: { api: 'https://connect.squareupsandbox.com', authorize: 'https://connect.squareupsandbox.com/oauth2/authorize' },
+} as const
+
+/** The configured environment, or '' when NUXT_SQUARE_ENV is missing or not one of the two. */
+export function squareEnvSetting(): SquareEnv | '' {
+  const v = String(useRuntimeConfig().square?.env || '').trim().toLowerCase()
+  return v === 'production' || v === 'sandbox' ? v : ''
+}
+
 export function squareAuthConfig() {
   const cfg = useRuntimeConfig()
-  const env = String(cfg.square?.env || 'production') === 'sandbox' ? 'sandbox' : 'production'
+  const env: SquareEnv = squareEnvSetting() || 'production'
+  // Test-only overrides; never honoured on Vercel so a stray value can't send the app secret elsewhere.
+  const testing = !onVercel()
   return {
-    appId: String(cfg.square?.appId || ''),
-    appSecret: String(cfg.square?.appSecret || ''),
+    appId: String(cfg.square?.appId || '').trim(),
+    appSecret: String(cfg.square?.appSecret || '').trim(),
     env,
-    redirectUrl: String(cfg.square?.redirectUrl || ''),
-    api: process.env.NUXT_SQUARE_API_ORIGIN || (env === 'sandbox' ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com'),
-    authorize: process.env.NUXT_SQUARE_AUTHORIZE_URL || (env === 'sandbox' ? 'https://app.squareupsandbox.com/oauth2/authorize' : 'https://connect.squareup.com/oauth2/authorize'),
+    redirectUrl: String(cfg.square?.redirectUrl || '').trim(),
+    api: (testing && process.env.NUXT_SQUARE_API_ORIGIN) || HOSTS[env].api,
+    authorize: (testing && process.env.NUXT_SQUARE_AUTHORIZE_URL) || HOSTS[env].authorize,
   }
 }
 
-/** What is still missing before a real Square account can be connected. Names only, never values. */
+/**
+ * What is still missing or inconsistent before a Square account can be
+ * connected. Variable names and hints only, never values.
+ */
 export function squareSetupProblems(): string[] {
-  const { appId, appSecret } = squareAuthConfig()
-  const missing: string[] = []
-  if (!appId) missing.push('NUXT_SQUARE_APP_ID')
-  if (!appSecret) missing.push('NUXT_SQUARE_APP_SECRET')
-  if (!envSessionSecret()) missing.push('NUXT_SESSION_SECRET (32+ characters; seals the Square tokens)')
-  return missing
+  const { appId, appSecret, redirectUrl } = squareAuthConfig()
+  const env = squareEnvSetting()
+  const problems: string[] = []
+  if (!appId) problems.push('NUXT_SQUARE_APP_ID')
+  if (!appSecret) problems.push('NUXT_SQUARE_APP_SECRET')
+  if (!env) problems.push('NUXT_SQUARE_ENV (production for Nino’s real store, sandbox only for testing)')
+  if (env === 'production' && appId.startsWith('sandbox-')) problems.push('NUXT_SQUARE_APP_ID is a Sandbox ID but NUXT_SQUARE_ENV is production: use the Production credentials from the Square app')
+  if (!envSessionSecret()) problems.push('NUXT_SESSION_SECRET (32+ characters; seals the Square tokens)')
+  if (redirectUrl && !/^https?:\/\/[^/]+\/api\/admin\/auth\/square\/callback$/.test(redirectUrl)) {
+    problems.push('NUXT_SQUARE_REDIRECT_URL must be https://<preview host>/api/admin/auth/square/callback')
+  }
+  if (redirectUrl && env === 'production' && !redirectUrl.startsWith('https://')) problems.push('NUXT_SQUARE_REDIRECT_URL must use https for Production')
+  if (!redirectUrl && onVercel()) problems.push('NUXT_SQUARE_REDIRECT_URL (the exact callback URL registered on the Square app)')
+  return problems
+}
+
+/** Host a request arrived on (behind Vercel's proxy too). */
+export function requestHost(event: H3Event) {
+  return (getRequestHeader(event, 'x-forwarded-host') || getRequestHeader(event, 'host') || '').toLowerCase()
+}
+
+/** Host of the registered callback URL, or '' when none is configured. */
+export function canonicalHost() {
+  const origin = canonicalOrigin()
+  return origin ? new URL(origin).host.toLowerCase() : ''
+}
+
+/** Origin (scheme + host) of the registered callback, when one is configured. */
+export function canonicalOrigin() {
+  const url = squareAuthConfig().redirectUrl
+  if (!url) return ''
+  try {
+    return new URL(url).origin
+  } catch {
+    return ''
+  }
 }
 
 export const squareIsDemo = () => isDemoEnv()
@@ -228,9 +285,17 @@ export const DEMO_IDENTITY: SquareIdentity = {
  * A usable access token for the Square APIs, refreshed when it is within a
  * week of expiry. Null when no real Square account is connected.
  */
+/** The stored connection, only if it belongs to the Square environment configured now. */
+export async function currentConnection(): Promise<SquareConnection | null> {
+  const conn = await getConnection()
+  if (!conn) return null
+  if (conn.source === 'demo') return isDemoEnv() ? conn : null
+  return (conn.env ?? 'production') === squareAuthConfig().env ? conn : null
+}
+
 export async function connectedAccessToken(): Promise<{ token: string; locationId: string } | null> {
   if (isDemoEnv()) return null
-  const conn = await getConnection()
+  const conn = await currentConnection()
   if (!conn || conn.source !== 'square' || !conn.sealed) return null
   let tokens: Tokens
   try {

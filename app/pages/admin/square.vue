@@ -10,6 +10,7 @@ interface Status {
   hasLocation: boolean
   canConnect: boolean
   problems: string[]
+  callbackUrl: string | null
   connection: { businessName: string; email: string; merchantId: string; locationName: string; locationId: string; connectedAt: string; expiresAt: string; source: 'square' | 'demo' } | null
   note: string
   state: { lastPreviewAt: string | null; lastApplyAt: string | null; lastError: string | null }
@@ -119,6 +120,10 @@ async function apply() {
         <AdminButton v-if="status?.connection" variant="danger" @click="confirmDisconnect = true">Disconnect</AdminButton>
       </div>
       <p v-if="!status?.connection && status?.canConnect && !status.demo" class="mt-2 text-xs text-white/55">You’ll sign in on Square’s own page and approve access. This site never sees your Square password, and the access it gets is stored encrypted on the server.</p>
+      <p v-if="!status?.demo" class="mt-3 text-xs text-white/55" data-square-env>
+        Square environment: <strong class="text-white">{{ status?.env === 'production' ? 'Production (your real store)' : 'Sandbox (test accounts only)' }}</strong>.
+        <template v-if="status?.callbackUrl"> Callback: <code class="font-mono break-all">{{ status.callbackUrl }}</code></template>
+      </p>
       <div v-if="status?.problems.length" class="mt-3 rounded-md border border-white/15 bg-nc-char p-3 text-sm" data-square-missing>
         <p class="font-semibold">Missing site settings (Nick sets these in Vercel):</p>
         <ul class="mt-1 list-disc pl-5 text-white/80"><li v-for="p in status.problems" :key="p"><code class="font-mono text-xs">{{ p }}</code></li></ul>

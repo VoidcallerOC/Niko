@@ -1,8 +1,8 @@
 import { anonymousSession, getOwnerSession, signInAsOwner } from '../../../../utils/admin/auth'
-import { checkSquareAccess, getOwner, putOwner } from '../../../../utils/admin/owner'
+import { checkSquareAccess, getOwner, linkedMerchant, putOwner } from '../../../../utils/admin/owner'
 import { logActivity, nowIso } from '../../../../utils/admin/store'
 import {
-  DEMO_IDENTITY, exchangeCode, fetchIdentity, putConnection, redirectUrlFor, revokeTokens, seal, squareIsDemo, type SquareIdentity,
+  DEMO_IDENTITY, exchangeCode, fetchIdentity, putConnection, redirectUrlFor, revokeTokens, seal, squareAuthConfig, squareIsDemo, type SquareIdentity,
 } from '../../../../utils/admin/squareAuth'
 
 /** Square sends the browser back here with ?code&state (or ?error). */
@@ -41,7 +41,8 @@ export default defineEventHandler(async (event) => {
   const owner = await getOwner()
   const signedIn = intent === 'connect' && !!(await getOwnerSession(event))
   if (intent === 'connect' && !signedIn) return fail('signedout')
-  const check = checkSquareAccess(owner, identity, intent)
+  const env = squareAuthConfig().env
+  const check = checkSquareAccess(owner, identity, intent, env)
   if (!check.ok || !owner) {
     // Do not keep access we are not going to use.
     await revokeTokens(tokens.accessToken)
@@ -50,20 +51,23 @@ export default defineEventHandler(async (event) => {
 
   await putConnection({
     sealed: seal({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }),
+    env,
     expiresAt: tokens.expiresAt,
     ...sample(identity),
     connectedAt: nowIso(),
     source: 'square',
   })
-  if (!owner.merchantId || owner.businessName !== identity.businessName) {
-    await putOwner({ ...owner, merchantId: identity.merchantId, businessName: identity.businessName })
+  // First merchant authorized in this environment is bound to the owner account.
+  const first = !linkedMerchant(owner, env)
+  if (first || owner.businessName !== identity.businessName) {
+    await putOwner({ ...owner, merchantId: identity.merchantId, squareEnv: env, businessName: identity.businessName })
   }
   if (intent === 'signin') await signInAsOwner(event, owner, 'square')
   await logActivity({
     kind: 'square',
     entity: 'square',
     entityId: identity.merchantId,
-    summary: intent === 'connect' ? `Square connected (${identity.businessName || identity.merchantId})` : 'Signed in with Square',
+    summary: intent === 'connect' ? `Square ${env} connected (${identity.businessName || identity.merchantId})${first ? '; bound to the owner account' : ''}` : 'Signed in with Square',
   })
   return sendRedirect(event, intent === 'connect' ? `${next}${next.includes('?') ? '&' : '?'}connected=1` : next, 302)
 })

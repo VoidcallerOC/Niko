@@ -94,6 +94,22 @@ const submit = () => after(() => post('/api/admin/auth/login', { email: email.va
           <AdminButton type="submit" variant="red" size="lg" block :busy="busy" :disabled="!password || (!session.demo && !email)">Sign in</AdminButton>
         </form>
       </template>
+      <!-- For Nick: confirm the Preview is configured before sending Nino the link -->
+      <details v-if="session?.setupCheck && !session.signedIn" class="mt-8 rounded-md border border-white/15 bg-nc-char p-4 text-sm" data-setup-check :open="!!session.blocked">
+        <summary class="min-h-11 cursor-pointer font-semibold">Setup check (for Nick)</summary>
+        <ul class="mt-2 grid gap-1.5">
+          <li v-for="item in session.setupCheck.items" :key="item.key" class="flex items-start gap-2">
+            <span aria-hidden="true" class="mt-0.5 font-bold" :class="item.ok ? 'text-white' : 'text-nc-red-bright'">{{ item.ok ? '✓' : '✗' }}</span>
+            <span :class="item.ok ? 'text-white/80' : 'text-white'">{{ item.label }}<span class="sr-only">{{ item.ok ? ' (ok)' : ' (needs attention)' }}</span></span>
+          </li>
+        </ul>
+        <p class="mt-3 text-white/70">Register this exact Redirect URL on the Square app’s OAuth page:</p>
+        <code class="mt-1 block rounded-sm bg-white/10 px-2 py-1.5 font-mono text-xs break-all text-white" data-callback-url>{{ session.setupCheck.callbackUrl }}</code>
+        <ul v-if="session.setupCheck.squareProblems.length" class="mt-3 list-disc pl-5 text-white/70">
+          <li v-for="p in session.setupCheck.squareProblems" :key="p">{{ p }}</li>
+        </ul>
+        <p class="mt-3 text-xs text-white/50">This list disappears once Nino’s account exists. It shows settings names only, never their values.</p>
+      </details>
       <p class="mt-8 text-center text-sm"><NuxtLink to="/" class="nav-link">Back to the site</NuxtLink></p>
     </div>
   </div>

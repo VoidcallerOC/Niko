@@ -1,5 +1,13 @@
 /** Shape of /api/admin/auth/session. Owner details appear only when signed in. */
+export interface SetupCheck {
+  items: Array<{ key: string; ok: boolean; label: string }>
+  squareProblems: string[]
+  callbackUrl: string
+}
+
 export interface AdminSessionInfo {
+  /** Configuration checklist (before the owner exists, or for the signed-in owner). */
+  setupCheck: SetupCheck | null
   signedIn: boolean
   demo: boolean
   /** Why nobody can sign in or set up right now (missing storage or setup code). */

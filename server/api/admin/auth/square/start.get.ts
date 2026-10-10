@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { anonymousSession, getOwnerSession } from '../../../../utils/admin/auth'
-import { getOwner } from '../../../../utils/admin/owner'
-import { authorizeUrl, redirectUrlFor, squareIsDemo, squareSetupProblems } from '../../../../utils/admin/squareAuth'
+import { getOwner, linkedMerchant } from '../../../../utils/admin/owner'
+import { authorizeUrl, redirectUrlFor, squareAuthConfig, squareIsDemo, squareSetupProblems } from '../../../../utils/admin/squareAuth'
 
 /**
  * Start a Square OAuth round trip.
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     if (squareSetupProblems().length) return back('notconfigured')
     if (intent === 'signin') {
       const owner = await getOwner()
-      if (!owner?.merchantId) return back('nosquare')
+      if (!linkedMerchant(owner, squareAuthConfig().env)) return back('nosquare')
     }
   } else if (intent === 'signin') {
     return back('nosquare')

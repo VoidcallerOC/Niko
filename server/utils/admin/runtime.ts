@@ -53,7 +53,13 @@ export function chooseBackend(): StorageStatus {
   if (isDemoEnv()) {
     return { backend: 'demo', durable: false, problem: null, label: 'Demo memory (SAMPLE data, resets on restart)' }
   }
-  if (redisUrl()) return { backend: 'redis', durable: true, problem: null, label: 'Redis (durable)' }
+  if (redisUrl()) {
+    // On Vercel the cookie/token key must come from the environment, never from a generated value.
+    const problem = onVercel() && !envSessionSecret()
+      ? 'NUXT_SESSION_SECRET is not set. Nick needs to add it (32+ random characters) to the Vercel project and redeploy.'
+      : null
+    return { backend: 'redis', durable: true, problem, label: 'Redis (durable)' }
+  }
   if (onVercel()) {
     return {
       backend: 'none',

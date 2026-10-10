@@ -3,7 +3,8 @@ import type { Product, SquareField } from './types'
 import { SQUARE_SYNC_FIELDS, emptyProduct } from './types'
 import { getProduct, listProducts, logActivity, newId, nowIso, putProduct, saveRevision, putSquareState, getSquareState } from './store'
 import { isDemo } from './auth'
-import { connectedAccessToken, getConnection, squareAuthConfig, squareSetupProblems } from './squareAuth'
+import { connectedAccessToken, currentConnection, getConnection, redirectUrlFor, squareAuthConfig, squareSetupProblems } from './squareAuth'
+import type { H3Event } from 'h3'
 
 /**
  * Square, official Catalog + Inventory APIs only
@@ -311,20 +312,34 @@ export async function applySync(plan: ApplyPlan) {
   return report
 }
 
-export async function squareStatus() {
+export async function squareStatus(event?: H3Event) {
   const demo = isDemo()
   const { token, env, locationId } = await config()
-  const conn = await getConnection().catch(() => null)
+  const conn = await currentConnection().catch(() => null)
+  const stored = await getConnection().catch(() => null)
+  const otherEnv = !demo && stored && !conn && stored.source === 'square' ? (stored.env ?? 'production') : null
   const problems = demo ? [] : squareSetupProblems()
   const connection = conn
     ? { businessName: conn.businessName, email: conn.email, merchantId: conn.merchantId, locationName: conn.locationName, locationId: conn.locationId, connectedAt: conn.connectedAt, expiresAt: conn.expiresAt, source: conn.source }
     : null
   const note = demo
     ? 'Demo mode: a labelled SAMPLE Square catalog stands in for a real account. No real Square account is ever contacted in demo mode.'
-    : token
+    : otherEnv
+      ? `The saved Square connection is from ${otherEnv}, but this site is now set to ${env}. Connect again to link the ${env} account.`
+      : token
       ? `Connected to Square ${env} as ${conn?.businessName || conn?.merchantId || 'the owner account'}.${locationId ? '' : ' No active location was found, so quantities are not synced.'}`
       : problems.length
         ? 'Square can’t be connected yet: the site is missing its Square app settings. Nick needs to set the values listed below; then Nino connects with his own Square login.'
         : 'Not connected. Tap Connect Square to sign in on Square’s own page and approve access. The admin works fully without it.'
-  return { configured: demo || !!token, demo, env, hasLocation: !!locationId, canConnect: demo || problems.length === 0, problems, connection, note }
+  return {
+    configured: demo || !!token,
+    demo,
+    env,
+    hasLocation: !!locationId,
+    canConnect: demo || problems.length === 0,
+    problems,
+    connection,
+    note,
+    callbackUrl: demo ? null : event ? redirectUrlFor(event) : squareAuthConfig().redirectUrl || null,
+  }
 }

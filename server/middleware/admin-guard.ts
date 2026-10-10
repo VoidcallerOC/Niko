@@ -1,5 +1,6 @@
 import { assertSameOrigin, getOwnerSession } from '../utils/admin/auth'
 import { ensureSessionSecret } from '../utils/admin/runtime'
+import { canonicalHost, canonicalOrigin, requestHost } from '../utils/admin/squareAuth'
 
 /**
  * Server-side gate for everything under /admin and /api/admin.
@@ -20,6 +21,17 @@ export default defineEventHandler(async (event) => {
 
   setHeader(event, 'Cache-Control', 'no-store')
   setHeader(event, 'X-Robots-Tag', 'noindex, nofollow')
+
+  // Keep the admin on the host registered with Square (NUXT_SQUARE_REDIRECT_URL).
+  // Cookies are per host, so starting the Square round trip on a different
+  // Vercel URL (e.g. a deployment-specific one) would lose the session and the
+  // OAuth state. Only safe GET navigations are moved.
+  // Cookies are scoped by host, so the host is what has to match.
+  const canonical = canonicalHost()
+  if (canonical && event.method === 'GET' && (isPage || path === '/api/admin/auth/square/start')) {
+    const host = requestHost(event)
+    if (host && host !== canonical) return sendRedirect(event, canonicalOrigin() + event.path, 302)
+  }
 
   // Load (or create) the session secret before anything reads a cookie.
   try {

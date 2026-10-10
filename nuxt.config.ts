@@ -41,11 +41,20 @@ export default defineNuxtConfig({
   //   NUXT_ADMIN_DEMO          1 = demo mode (in-memory SAMPLE data only)
   //   NUXT_SQUARE_APP_ID / NUXT_SQUARE_APP_SECRET / NUXT_SQUARE_ENV / NUXT_SQUARE_REDIRECT_URL
   // Storage: REDIS_URL (or KV_URL), read directly by server/plugins/admin-storage.ts.
+  //   JUSTTCG_API_KEY (or NUXT_JUSTTCG_API_KEY)  card search + market prices for /scan
+  //   NUXT_PUBLIC_BUY_RATE                       percent of market reference offered (default 60%)
   runtimeConfig: {
     sessionSecret: '',
     adminDemo: '',
     adminSetupCode: '',
     square: { appId: '', appSecret: '', env: '', redirectUrl: '' },
+    justtcgApiKey: '',
+    public: {
+      // Same buy rate the TCG Buy Calculator is configured with (data/config.json).
+      buyRate: '60%',
+      // Prices older than this are never used for an estimate.
+      staleThresholdDays: 7,
+    },
   },
 
 })

@@ -35,7 +35,8 @@ The public homepage reads `/api/site`: featured cards get their own "Cards on th
 
 ## Access control
 
-- Sign-in is checked on the server (`server/utils/admin/auth.ts`). The password is compared against an scrypt hash from `NUXT_ADMIN_PASSWORD_HASH`; the hash never reaches the browser.
+- **Sign in with Square** (`server/utils/admin/squareAuth.ts`, routes under `server/api/admin/auth/square/`): official Square OAuth. The start route stores a random state in the sealed session cookie and redirects to Square; the callback checks the state, exchanges the code for tokens using the app secret (server only), reads the merchant (business name), the owner's email (Team Members API, `EMPLOYEES_READ`) and the main location, seals the tokens with AES-256-GCM under `NUXT_SESSION_SECRET`, stores them in the admin store, and signs the owner in. **The first Square account to complete this becomes the owner**: its merchant id and email are stored as the admin login. Later sign-ins must match that merchant id, and the email too when both sides know it. Anyone else gets "not the owner account". Needs `NUXT_SQUARE_APP_ID` and `NUXT_SQUARE_APP_SECRET`, and the callback URL registered in the Square developer dashboard.
+- **Password sign-in** (`server/utils/admin/auth.ts`) remains as an alternative: the password is compared against an scrypt hash from `NUXT_ADMIN_PASSWORD_HASH`; the hash never reaches the browser.
 - The session is an h3 sealed cookie: HTTP-only, SameSite=Lax, Secure outside dev, 12-hour lifetime, encrypted with `NUXT_SESSION_SECRET`.
 - `server/middleware/admin-guard.ts` runs before every request: `/api/admin/*` without a session returns 401 (auth endpoints excepted); `/admin/*` pages redirect to `/admin/login` before any HTML renders. `app/middleware/admin.ts` repeats the check for in-app navigation by asking the server. All admin responses are `Cache-Control: no-store` and `X-Robots-Tag: noindex`.
 - Mutations must be same-origin (Origin / Sec-Fetch-Site check); JSON only; 5 failed sign-ins per IP per 15 minutes.
@@ -64,7 +65,8 @@ The public homepage reads `/api/site`: featured cards get their own "Cards on th
 
 ## Square
 
-- Optional. Without `NUXT_SQUARE_ACCESS_TOKEN` the Square page explains how to connect and everything else works.
+- Access comes from the OAuth grant made at sign-in (tokens sealed in the store, refreshed automatically within a week of expiry, revoked on Disconnect). A personal access token in `NUXT_SQUARE_ACCESS_TOKEN` still works as a self-hosted fallback. The location used for inventory counts is the merchant's main active location, read at connect time.
+- Optional. Without a connection the Square page explains how to connect and everything else works.
 - With a token: Preview lists (1) Square items not yet linked here, importable as drafts; (2) field-by-field differences on linked cards with both values shown; (3) listed cards that could be pushed. Apply performs only what was ticked and confirmed, matches by stored Square id (never by name guesses), upserts in place with idempotency keys, and never deletes on either side.
 - In demo mode a labelled SAMPLE catalog stands in so the flow can be previewed; no real account is contacted.
 - Needs from Nino before enabling: a Square developer access token for his account (sandbox first), the location id, and approval of what pushes mean for his Square Online storefront.
@@ -77,9 +79,9 @@ The public homepage reads `/api/site`: featured cards get their own "Cards on th
 
 ## Needs Nino's approval or credentials
 
-1. Owner password → run `scripts/admin-password.mjs`, set `NUXT_ADMIN_PASSWORD_HASH` and `NUXT_SESSION_SECRET` in the hosting environment.
+1. `NUXT_SESSION_SECRET` in the hosting environment, plus either the Square app (item 3) for Sign in with Square or a password hash from `scripts/admin-password.mjs`. Nino's first Square sign-in binds his account as the owner; no password is needed after that.
 2. Durable storage before real inventory: the preview uses the filesystem (`server/plugins/admin-storage.ts`). Vercel's function filesystem does not persist between deployments or instances. Swap the driver for Vercel Blob/KV, Redis or S3 (one file change) and add its credentials.
-3. Square token and location id (optional).
+3. A Square application (app id + secret, callback URL registered) so Nino can sign in and connect with his own Square login. Sandbox first.
 4. Instagram Graph API app approval (optional).
 5. Public copy, featured cards and events: entered by Nino, nothing pre-filled.
 6. Whether the admin should go live on the production domain at all; it is currently unpublished.

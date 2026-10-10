@@ -36,12 +36,13 @@ export default defineNuxtConfig({
   },
   // Admin records and uploads are mounted at runtime in server/plugins/admin-storage.ts.
   // Server-only secrets. Each maps to an env var: NUXT_SESSION_SECRET,
-  // NUXT_ADMIN_PASSWORD_HASH, NUXT_ADMIN_DEMO, NUXT_SQUARE_ACCESS_TOKEN,
-  // NUXT_SQUARE_LOCATION_ID, NUXT_SQUARE_ENV. None are exposed to the client.
+  // NUXT_ADMIN_PASSWORD_HASH, NUXT_ADMIN_DEMO, NUXT_SQUARE_APP_ID,
+  // NUXT_SQUARE_APP_SECRET, NUXT_SQUARE_ENV, NUXT_SQUARE_REDIRECT_URL,
+  // NUXT_SQUARE_ACCESS_TOKEN, NUXT_SQUARE_LOCATION_ID. None reach the client.
   runtimeConfig: {
     sessionSecret: '',
     adminPasswordHash: '',
     adminDemo: '',
-    square: { accessToken: '', locationId: '', env: '' },
+    square: { appId: '', appSecret: '', env: '', redirectUrl: '', accessToken: '', locationId: '' },
   },
 })

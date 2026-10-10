@@ -8,6 +8,9 @@ interface Status {
   demo: boolean
   env: string
   hasLocation: boolean
+  via: 'oauth' | 'env' | null
+  oauthReady: boolean
+  connection: { businessName: string; email: string; merchantId: string; locationName: string; locationId: string; connectedAt: string; expiresAt: string; source: 'square' | 'demo' } | null
   note: string
   state: { lastPreviewAt: string | null; lastApplyAt: string | null; lastError: string | null }
 }
@@ -16,6 +19,16 @@ const toast = useAdminToast()
 const { data: status, refresh: refreshStatus } = await useAsyncData('admin-square', () => useRequestFetch()<Status>('/api/admin/square/status'))
 
 const preview = ref<SyncPreview | null>(null)
+const confirmDisconnect = ref(false)
+async function disconnect() {
+  const res = await call('/api/admin/square/disconnect')
+  confirmDisconnect.value = false
+  if (res) {
+    toast.saved('Square disconnected')
+    preview.value = null
+    await refreshStatus()
+  }
+}
 const busy = ref(false)
 const confirmOpen = ref(false)
 const imports = ref(new Set<string>())
@@ -80,6 +93,16 @@ async function apply() {
 
     <AdminPanel title="Connection">
       <p class="text-sm" :class="status?.configured ? 'text-white' : status?.demo ? 'text-nc-red-bright' : 'text-nc-mist'">{{ status?.note }}</p>
+      <dl v-if="status?.connection" class="mt-3 grid gap-2 rounded-md bg-nc-char p-3 text-sm sm:grid-cols-2">
+        <div><dt class="text-white/60">Square account</dt><dd class="font-semibold">{{ status.connection.businessName || status.connection.merchantId }}<span v-if="status.connection.source === 'demo'" class="ml-2 rounded-sm bg-nc-red px-1.5 py-0.5 text-[0.6875rem] font-bold text-white uppercase">Sample</span></dd></div>
+        <div><dt class="text-white/60">Owner email</dt><dd class="font-semibold">{{ status.connection.email || 'not shared by Square' }}</dd></div>
+        <div><dt class="text-white/60">Location</dt><dd class="font-semibold">{{ status.connection.locationName || status.connection.locationId || 'none found' }}</dd></div>
+        <div><dt class="text-white/60">Connected</dt><dd class="font-semibold">{{ timeAgo(status.connection.connectedAt) }}<span v-if="status.connection.expiresAt" class="text-white/60"> · token renews automatically</span></dd></div>
+      </dl>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <a v-if="!status?.connection && status?.oauthReady" href="/api/admin/auth/square/start?next=%2Fadmin%2Fsquare" class="inline-flex min-h-12 items-center justify-center rounded-md bg-white px-4 text-[0.9375rem] font-semibold text-nc-ink hover:bg-white/85">Connect Square</a>
+        <AdminButton v-if="status?.connection" variant="danger" @click="confirmDisconnect = true">Disconnect</AdminButton>
+      </div>
       <dl class="mt-3 grid gap-2 text-xs text-white/60 sm:grid-cols-3">
         <div><dt>Last preview</dt><dd class="text-white">{{ status?.state.lastPreviewAt ? timeAgo(status.state.lastPreviewAt) : 'never' }}</dd></div>
         <div><dt>Last applied</dt><dd class="text-white">{{ status?.state.lastApplyAt ? timeAgo(status.state.lastApplyAt) : 'never' }}</dd></div>
@@ -141,6 +164,9 @@ async function apply() {
       </div>
     </template>
 
+    <AdminConfirm :open="confirmDisconnect" title="Disconnect Square?" confirm-label="Disconnect" danger @confirm="disconnect" @cancel="confirmDisconnect = false">
+      <p>The stored Square tokens are revoked. Cards keep their Square links, so reconnecting later picks up where it left off. The owner sign-in binding is kept.</p>
+    </AdminConfirm>
     <AdminConfirm :open="confirmOpen" title="Apply this sync?" confirm-label="Apply" :busy="busy" @confirm="apply" @cancel="confirmOpen = false">
       <ul class="list-disc pl-5">
         <li>{{ imports.size }} Square item{{ imports.size === 1 ? '' : 's' }} become drafts here</li>

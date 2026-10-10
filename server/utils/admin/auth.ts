@@ -26,9 +26,17 @@ export interface AdminSessionData {
   owner?: true
   signedInAt?: string
   demo?: boolean
+  /** How the owner signed in. */
+  via?: 'password' | 'square'
+  email?: string
+  businessName?: string
+  /** Square OAuth CSRF state while a sign-in is in flight. */
+  oauthState?: string
+  oauthNext?: string
 }
 
 export interface AuthConfig {
+  /** Password sign-in mode; Square sign-in is reported separately by the session endpoint. */
   mode: 'password' | 'demo' | 'unconfigured'
   secret: string | null
   reason?: string
@@ -53,7 +61,7 @@ export function authConfig(): AuthConfig {
   }
   if (demo) return { mode: 'demo', secret }
   if (hash.startsWith('scrypt$')) return { mode: 'password', secret }
-  return { mode: 'unconfigured', secret, reason: 'NUXT_ADMIN_PASSWORD_HASH is not set. Run `node scripts/admin-password.mjs` to create one.' }
+  return { mode: 'unconfigured', secret, reason: 'No password is set (NUXT_ADMIN_PASSWORD_HASH). Sign in with Square instead, or run `node scripts/admin-password.mjs`.' }
 }
 
 export const isDemo = () => authConfig().mode === 'demo'
@@ -73,7 +81,7 @@ export function verifyPassword(password: string, stored: string) {
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
-function sessionFor(event: H3Event, secret: string) {
+export function sessionFor(event: H3Event, secret: string) {
   return useSession<AdminSessionData>(event, {
     name: SESSION_NAME,
     password: secret,
@@ -153,7 +161,24 @@ export async function signIn(event: H3Event, password: string) {
   clearFailures(event)
   const session = await sessionFor(event, cfg.secret)
   await session.clear()
-  await session.update({ owner: true, signedInAt: new Date().toISOString(), demo: cfg.mode === 'demo' })
+  await session.update({ owner: true, via: 'password', signedInAt: new Date().toISOString(), demo: cfg.mode === 'demo' })
+  return session
+}
+
+/** Session cookie for a visitor who is not signed in yet (used to hold the OAuth state). */
+export async function anonymousSession(event: H3Event) {
+  const cfg = authConfig()
+  if (!cfg.secret) throw createError({ statusCode: 503, statusMessage: cfg.reason ?? 'Sign-in is not configured.' })
+  return sessionFor(event, cfg.secret)
+}
+
+/** Sign the owner in after a verified Square identity (binding already checked by the caller). */
+export async function signInOwner(event: H3Event, data: Pick<AdminSessionData, 'via' | 'email' | 'businessName' | 'demo'>) {
+  const cfg = authConfig()
+  if (!cfg.secret) throw createError({ statusCode: 503, statusMessage: cfg.reason ?? 'Sign-in is not configured.' })
+  const session = await sessionFor(event, cfg.secret)
+  await session.clear()
+  await session.update({ owner: true, signedInAt: new Date().toISOString(), ...data })
   return session
 }
 

@@ -6,7 +6,7 @@ interface Dashboard {
   counts: { listed: number; drafts: number; hidden: number; sold: number; lowStock: number; trash: number; upcomingEvents: number }
   lowStock: Array<{ id: string; title: string; quantity: number }>
   activity: Array<{ id: string; at: string; kind: string; entity: string; entityId: string | null; summary: string }>
-  integrations: { square: { configured: boolean; demo: boolean; lastApplyAt: string | null; lastError: string | null }; instagram: { source: string; importedAt: string; liveSync: boolean } }
+  integrations: { square: { configured: boolean; demo: boolean; businessName: string; lastApplyAt: string | null; lastError: string | null }; instagram: { source: string; importedAt: string; liveSync: boolean } }
 }
 const { data, error } = await useAsyncData('admin-dashboard', () => useRequestFetch()<Dashboard>('/api/admin/dashboard'))
 
@@ -75,7 +75,7 @@ const tiles = computed(() => {
           <dt class="text-sm font-semibold">Square</dt>
           <dd class="mt-1 text-sm text-nc-mist">
             <template v-if="data?.integrations.square.demo">Demo: a SAMPLE catalog stands in for Square. No real account is contacted.</template>
-            <template v-else-if="data?.integrations.square.configured">Connected. Last applied sync: {{ data.integrations.square.lastApplyAt ? timeAgo(data.integrations.square.lastApplyAt) : 'never' }}.</template>
+            <template v-else-if="data?.integrations.square.configured">Connected<template v-if="data.integrations.square.businessName"> as {{ data.integrations.square.businessName }}</template>. Last applied sync: {{ data.integrations.square.lastApplyAt ? timeAgo(data.integrations.square.lastApplyAt) : 'never' }}.</template>
             <template v-else>Not connected. The admin works without it.</template>
             <span v-if="data?.integrations.square.lastError" class="block text-nc-red-bright">Last error: {{ data.integrations.square.lastError }}</span>
             <NuxtLink to="/admin/square" class="ml-1 underline">Square page</NuxtLink>

@@ -3,6 +3,7 @@ import type { Product, SquareField } from './types'
 import { SQUARE_SYNC_FIELDS, emptyProduct } from './types'
 import { getProduct, listProducts, logActivity, newId, nowIso, putProduct, saveRevision, putSquareState, getSquareState } from './store'
 import { isDemo } from './auth'
+import { connectedAccessToken, getConnection, squareAuthConfig } from './squareAuth'
 
 /**
  * Square, official Catalog + Inventory APIs only
@@ -61,20 +62,25 @@ export interface ApplyPlan {
   confirm: boolean
 }
 
-function config() {
+/**
+ * Access comes from the OAuth connection made by "Sign in with Square"
+ * (preferred, refreshed automatically) or, as a fallback for a self-hosted
+ * setup, a personal access token in NUXT_SQUARE_ACCESS_TOKEN.
+ */
+async function config() {
   const cfg = useRuntimeConfig()
-  const token = String(cfg.square?.accessToken || process.env.SQUARE_ACCESS_TOKEN || '')
-  const env = String(cfg.square?.env || process.env.SQUARE_ENV || 'production')
-  const locationId = String(cfg.square?.locationId || process.env.SQUARE_LOCATION_ID || '')
-  const origin = env === 'sandbox' ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com'
-  return { token, env, locationId, origin }
+  const { env, api: origin } = squareAuthConfig()
+  const oauth = await connectedAccessToken().catch(() => null)
+  const token = oauth?.token || String(cfg.square?.accessToken || process.env.SQUARE_ACCESS_TOKEN || '')
+  const locationId = oauth?.locationId || String(cfg.square?.locationId || process.env.SQUARE_LOCATION_ID || '')
+  return { token, env, locationId, origin, via: oauth ? ('oauth' as const) : token ? ('env' as const) : null }
 }
 
-export const squareConfigured = () => isDemo() || !!config().token
+export const squareConfigured = async () => isDemo() || !!(await config()).token
 
 async function squareFetch<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
-  const { token, origin } = config()
-  if (!token) throw createError({ statusCode: 503, statusMessage: 'Square is not connected. Add NUXT_SQUARE_ACCESS_TOKEN on the server.' })
+  const { token, origin } = await config()
+  if (!token) throw createError({ statusCode: 503, statusMessage: 'Square is not connected. Sign in with Square on the login page, or add NUXT_SQUARE_ACCESS_TOKEN on the server.' })
   const res = await fetch(`${origin}${path}`, {
     method: init?.method ?? 'GET',
     headers: {
@@ -100,7 +106,7 @@ const demoCatalog: SquareItem[] = [
 ]
 
 async function fetchCatalog(): Promise<{ items: SquareItem[]; source: 'square' | 'demo' }> {
-  if (isDemo() && !config().token) {
+  if (isDemo() && !(await config()).token) {
     // Link the first sample card so the conflict flow has something to show.
     const linked = await getProduct('demo000000000001')
     if (linked && !linked.squareId) await putProduct({ ...linked, squareId: 'SAMPLE-SQ-ITEM-1', squareVariationId: 'SAMPLE-SQ-VAR-1' })
@@ -127,7 +133,7 @@ async function fetchCatalog(): Promise<{ items: SquareItem[]; source: 'square' |
     }
     cursor = page.cursor
   } while (cursor)
-  const { locationId } = config()
+  const { locationId } = await config()
   const variationIds = items.map((i) => i.variationId).filter((x): x is string => !!x)
   if (locationId && variationIds.length) {
     for (let i = 0; i < variationIds.length; i += 100) {
@@ -291,7 +297,7 @@ export async function applySync(plan: ApplyPlan) {
     const obj = result.catalog_object
     const squareId = obj?.id ?? current?.id ?? null
     const variationId = obj?.item_data?.variations?.[0]?.id ?? current?.variationId ?? null
-    const { locationId } = config()
+    const { locationId } = await config()
     if (locationId && variationId) {
       await squareFetch('/v2/inventory/changes/batch-create', {
         method: 'POST',
@@ -311,17 +317,22 @@ export async function applySync(plan: ApplyPlan) {
   return report
 }
 
-export function squareStatus() {
-  const { token, env, locationId } = config()
-  return {
-    configured: !!token,
-    demo: isDemo() && !token,
-    env,
-    hasLocation: !!locationId,
-    note: token
-      ? `Connected to Square ${env} via NUXT_SQUARE_ACCESS_TOKEN${locationId ? '' : '. Add NUXT_SQUARE_LOCATION_ID to sync quantities.'}`
-      : isDemo()
-        ? 'Demo mode: a labelled SAMPLE Square catalog stands in for a real account. No real Square account is contacted.'
-        : 'Not connected. Nino can connect later by adding NUXT_SQUARE_ACCESS_TOKEN (and NUXT_SQUARE_LOCATION_ID) on the server. The admin works fully without it.',
-  }
+export async function squareStatus() {
+  const { token, env, locationId, via } = await config()
+  const conn = await getConnection().catch(() => null)
+  const { appId, appSecret } = squareAuthConfig()
+  const oauthReady = !!(appId && appSecret)
+  const connection = conn
+    ? { businessName: conn.businessName, email: conn.email, merchantId: conn.merchantId, locationName: conn.locationName, locationId: conn.locationId, connectedAt: conn.connectedAt, expiresAt: conn.expiresAt, source: conn.source }
+    : null
+  const note = token
+    ? via === 'oauth'
+      ? `Connected to Square ${env} as ${conn?.businessName || conn?.merchantId || 'the owner account'} through Sign in with Square.${locationId ? '' : ' No active location was found, so quantities are not synced.'}`
+      : `Connected to Square ${env} through NUXT_SQUARE_ACCESS_TOKEN${locationId ? '' : '. Add NUXT_SQUARE_LOCATION_ID to sync quantities.'}`
+    : isDemo()
+      ? 'Demo mode: a labelled SAMPLE Square catalog stands in for a real account. No real Square account is contacted.'
+      : oauthReady
+        ? 'Not connected. Use "Connect Square" below (or Sign in with Square on the login page) to link Nino’s Square account. The admin works fully without it.'
+        : 'Not connected. To enable, register a Square application and set NUXT_SQUARE_APP_ID and NUXT_SQUARE_APP_SECRET on the server; then Nino connects with his own Square login. The admin works fully without it.'
+  return { configured: !!token, demo: isDemo() && !token, env, hasLocation: !!locationId, via, oauthReady: oauthReady || isDemo(), connection, note }
 }

@@ -7,7 +7,7 @@ import { INSTAGRAM_IMPORT } from '../../utils/admin/instagram'
 
 export default defineEventHandler(async () => {
   await ensureDemoSeed()
-  const [products, events, settings, activity, square] = await Promise.all([listProducts(), listEvents(), getSettings(), recentActivity(12), getSquareState()])
+  const [products, events, settings, activity, square, sq] = await Promise.all([listProducts(), listEvents(), getSettings(), recentActivity(12), getSquareState(), squareStatus()])
   const live = products.filter((p) => !p.deletedAt)
   const today = new Date().toISOString().slice(0, 10)
   return {
@@ -24,7 +24,7 @@ export default defineEventHandler(async () => {
     lowStock: live.filter((p) => isLowStock(p, settings)).slice(0, 6).map((p) => ({ id: p.id, title: p.title, quantity: p.quantity })),
     activity,
     integrations: {
-      square: { configured: squareStatus().configured, demo: squareStatus().demo, lastApplyAt: square.lastApplyAt, lastError: square.lastError },
+      square: { configured: sq.configured, demo: sq.demo, businessName: sq.connection?.businessName ?? '', lastApplyAt: square.lastApplyAt, lastError: square.lastError },
       instagram: { source: INSTAGRAM_IMPORT.source, importedAt: INSTAGRAM_IMPORT.importedAt, liveSync: INSTAGRAM_IMPORT.liveSync },
     },
   }

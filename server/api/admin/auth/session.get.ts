@@ -1,14 +1,21 @@
 import { authConfig, getOwnerSession } from '../../../utils/admin/auth'
+import { getOwnerBinding, squareLoginAvailable, squareLoginIsDemo } from '../../../utils/admin/squareAuth'
 
-/** Safe to call signed-out: tells the login page which mode the server is in. */
+/** Safe to call signed-out: tells the login page which sign-in methods exist. */
 export default defineEventHandler(async (event) => {
   const cfg = authConfig()
   const session = await getOwnerSession(event)
+  const binding = await getOwnerBinding().catch(() => null)
+  const square = squareLoginAvailable() && !!cfg.secret
   return {
     signedIn: !!session,
     mode: cfg.mode,
-    reason: cfg.mode === 'unconfigured' ? cfg.reason ?? null : null,
+    reason: cfg.mode === 'unconfigured' && !square ? cfg.reason ?? null : null,
     demo: cfg.mode === 'demo',
     signedInAt: session?.data.signedInAt ?? null,
+    via: session?.data.via ?? null,
+    email: session?.data.email ?? null,
+    methods: { password: cfg.mode === 'password' || cfg.mode === 'demo', square, squareDemo: square && squareLoginIsDemo() },
+    owner: binding ? { bound: true, email: binding.email, businessName: binding.businessName, boundAt: binding.boundAt, source: binding.source } : { bound: false },
   }
 })

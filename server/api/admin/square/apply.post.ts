@@ -3,7 +3,7 @@ import { SQUARE_SYNC_FIELDS } from '../../../utils/admin/types'
 import { getSquareState, putSquareState } from '../../../utils/admin/store'
 
 export default defineEventHandler(async (event) => {
-  if (!squareConfigured()) throw createError({ statusCode: 503, statusMessage: 'Square is not connected.' })
+  if (!(await squareConfigured())) throw createError({ statusCode: 503, statusMessage: 'Square is not connected.' })
   const body = (await readBody(event)) as Partial<ApplyPlan> | null
   const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 500) : [])
   const resolutions = Array.isArray(body?.resolutions)

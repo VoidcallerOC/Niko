@@ -1,4 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
+
 import type { H3Event } from 'h3'
 
 /**
@@ -36,32 +37,27 @@ export interface AdminSessionData {
 }
 
 export interface AuthConfig {
-  /** Password sign-in mode; Square sign-in is reported separately by the session endpoint. */
-  mode: 'password' | 'demo' | 'unconfigured'
+  /**
+   * 'demo'     → fixed demo password, sample data.
+   * 'password' → an env hash (NUXT_ADMIN_PASSWORD_HASH) is set.
+   * 'owner'    → no env hash: the owner account in the store decides (first-run setup, Square, or both).
+   * 'unconfigured' → no usable session secret (should not happen: the storage plugin generates one).
+   */
+  mode: 'password' | 'demo' | 'owner' | 'unconfigured'
   secret: string | null
   reason?: string
 }
-
-let generatedSecret: string | null = null
 
 export function authConfig(): AuthConfig {
   const cfg = useRuntimeConfig()
   const demo = String(cfg.adminDemo ?? '') === '1' || String(cfg.adminDemo ?? '') === 'true'
   const hash = String(cfg.adminPasswordHash ?? '')
   let secret = String(cfg.sessionSecret ?? '')
-
-  if (secret.length < 32) {
-    if (demo || import.meta.dev) {
-      // Preview convenience only: sessions are invalidated on every restart.
-      generatedSecret ??= randomBytes(32).toString('hex')
-      secret = generatedSecret
-    } else {
-      return { mode: 'unconfigured', secret: null, reason: 'NUXT_SESSION_SECRET is missing or shorter than 32 characters.' }
-    }
-  }
+  if (secret.length < 32) secret = (globalThis as { __ncSessionSecret?: string }).__ncSessionSecret ?? ''
+  if (secret.length < 32) return { mode: 'unconfigured', secret: null, reason: 'No session secret is available yet. Set NUXT_SESSION_SECRET or check the admin storage mount.' }
   if (demo) return { mode: 'demo', secret }
   if (hash.startsWith('scrypt$')) return { mode: 'password', secret }
-  return { mode: 'unconfigured', secret, reason: 'No password is set (NUXT_ADMIN_PASSWORD_HASH). Sign in with Square instead, or run `node scripts/admin-password.mjs`.' }
+  return { mode: 'owner', secret }
 }
 
 export const isDemo = () => authConfig().mode === 'demo'
@@ -143,7 +139,12 @@ export function clearFailures(event: H3Event) {
   attempts.delete(clientKey(event))
 }
 
-export async function signIn(event: H3Event, password: string) {
+/**
+ * Password sign-in. Order of truth: demo password in demo mode; otherwise the
+ * owner account's own hash (set by Nino at first run or in Settings); otherwise
+ * the env hash. With an owner account, the email must match too.
+ */
+export async function signIn(event: H3Event, email: string, password: string, owner: { email: string; passwordHash?: string } | null) {
   const cfg = authConfig()
   if (cfg.mode === 'unconfigured' || !cfg.secret) {
     throw createError({ statusCode: 503, statusMessage: cfg.reason ?? 'Sign-in is not configured.' })
@@ -151,17 +152,18 @@ export async function signIn(event: H3Event, password: string) {
   if (!loginAllowed(event)) {
     throw createError({ statusCode: 429, statusMessage: 'Too many attempts. Wait 15 minutes and try again.' })
   }
-  const ok = cfg.mode === 'demo'
-    ? password === DEMO_PASSWORD
-    : verifyPassword(password, String(useRuntimeConfig().adminPasswordHash))
+  let ok = false
+  if (cfg.mode === 'demo') ok = password === DEMO_PASSWORD
+  else if (owner?.passwordHash) ok = owner.email.toLowerCase() === email.trim().toLowerCase() && verifyPassword(password, owner.passwordHash)
+  else if (cfg.mode === 'password') ok = verifyPassword(password, String(useRuntimeConfig().adminPasswordHash))
   if (!ok) {
     recordFailure(event)
-    throw createError({ statusCode: 401, statusMessage: 'Wrong password.' })
+    throw createError({ statusCode: 401, statusMessage: owner?.passwordHash ? 'Wrong email or password.' : 'Wrong password.' })
   }
   clearFailures(event)
   const session = await sessionFor(event, cfg.secret)
   await session.clear()
-  await session.update({ owner: true, via: 'password', signedInAt: new Date().toISOString(), demo: cfg.mode === 'demo' })
+  await session.update({ owner: true, via: 'password', email: owner?.email || '', signedInAt: new Date().toISOString(), demo: cfg.mode === 'demo' })
   return session
 }
 

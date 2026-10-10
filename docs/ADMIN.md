@@ -35,6 +35,9 @@ The public homepage reads `/api/site`: featured cards get their own "Cards on th
 
 ## Access control
 
+- **First run, no pre-set password.** With no owner account yet, `/admin/login` shows "Create owner account": Nino enters his email and a password of his choosing (stored only as an scrypt hash, nobody else ever sees it) and is signed in. Alternatively he taps Sign in with Square and that Square account becomes the owner. Either way the first person through claims the account, so on a public URL set `NUXT_ADMIN_SETUP_CODE` and hand Nino the code; setup then requires it. Afterwards sign-in asks for the owner email and password, and Settings → Owner sign-in lets him change the password or link his Square account (a Square account links to a password owner only when its owner email matches, or when he is already signed in).
+- **Session secret** comes from `NUXT_SESSION_SECRET`, or is generated on first start and kept in the admin store, so nothing has to be configured before the first sign-in.
+
 - **Sign in with Square** (`server/utils/admin/squareAuth.ts`, routes under `server/api/admin/auth/square/`): official Square OAuth. The start route stores a random state in the sealed session cookie and redirects to Square; the callback checks the state, exchanges the code for tokens using the app secret (server only), reads the merchant (business name), the owner's email (Team Members API, `EMPLOYEES_READ`) and the main location, seals the tokens with AES-256-GCM under `NUXT_SESSION_SECRET`, stores them in the admin store, and signs the owner in. **The first Square account to complete this becomes the owner**: its merchant id and email are stored as the admin login. Later sign-ins must match that merchant id, and the email too when both sides know it. Anyone else gets "not the owner account". Needs `NUXT_SQUARE_APP_ID` and `NUXT_SQUARE_APP_SECRET`, and the callback URL registered in the Square developer dashboard.
 - **Password sign-in** (`server/utils/admin/auth.ts`) remains as an alternative: the password is compared against an scrypt hash from `NUXT_ADMIN_PASSWORD_HASH`; the hash never reaches the browser.
 - The session is an h3 sealed cookie: HTTP-only, SameSite=Lax, Secure outside dev, 12-hour lifetime, encrypted with `NUXT_SESSION_SECRET`.
@@ -79,7 +82,7 @@ The public homepage reads `/api/site`: featured cards get their own "Cards on th
 
 ## Needs Nino's approval or credentials
 
-1. `NUXT_SESSION_SECRET` in the hosting environment, plus either the Square app (item 3) for Sign in with Square or a password hash from `scripts/admin-password.mjs`. Nino's first Square sign-in binds his account as the owner; no password is needed after that.
+1. Nothing for sign-in itself: Nino creates the owner account on his first visit. Recommended: `NUXT_ADMIN_SETUP_CODE` (give him the code) and `NUXT_SESSION_SECRET` on Vercel so sessions survive cold starts.
 2. Durable storage before real inventory: the preview uses the filesystem (`server/plugins/admin-storage.ts`). Vercel's function filesystem does not persist between deployments or instances. Swap the driver for Vercel Blob/KV, Redis or S3 (one file change) and add its credentials.
 3. A Square application (app id + secret, callback URL registered) so Nino can sign in and connect with his own Square login. Sandbox first.
 4. Instagram Graph API app approval (optional).

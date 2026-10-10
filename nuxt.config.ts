@@ -43,6 +43,8 @@ export default defineNuxtConfig({
     sessionSecret: '',
     adminPasswordHash: '',
     adminDemo: '',
+    // Optional one-time code required to create the owner account (NUXT_ADMIN_SETUP_CODE).
+    adminSetupCode: '',
     square: { appId: '', appSecret: '', env: '', redirectUrl: '', accessToken: '', locationId: '' },
   },
 })

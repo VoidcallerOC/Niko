@@ -1,4 +1,4 @@
-import { anonymousSession, signInOwner } from '../../../../utils/admin/auth'
+import { anonymousSession, getOwnerSession, signInOwner } from '../../../../utils/admin/auth'
 import { logActivity, nowIso } from '../../../../utils/admin/store'
 import { ensureDemoSeed } from '../../../../utils/admin/demo'
 import {
@@ -37,12 +37,15 @@ export default defineEventHandler(async (event) => {
   }
 
   const existing = await getOwnerBinding()
-  const check = checkOwnerBinding(existing, identity)
-  if (!check.ok) return fail(event, 'notowner')
+  const signedIn = !!(await getOwnerSession(event))
+  const check = checkOwnerBinding(existing, identity, signedIn)
+  if (!check.ok) return fail(event, existing && !existing.merchantId ? 'linkemail' : 'notowner')
 
   const now = nowIso()
   if (check.first) {
     await putOwnerBinding({ merchantId: identity.merchantId, email: identity.email, businessName: identity.businessName, boundAt: now, source: identity.source })
+  } else if (check.link && existing) {
+    await putOwnerBinding({ ...existing, merchantId: identity.merchantId, businessName: identity.businessName || existing.businessName, email: existing.email || identity.email })
   }
   await putConnection({
     sealed,
@@ -55,13 +58,13 @@ export default defineEventHandler(async (event) => {
     connectedAt: now,
     source: identity.source,
   })
-  await signInOwner(event, { via: 'square', email: identity.email, businessName: identity.businessName, demo: identity.source === 'demo' })
+  await signInOwner(event, { via: 'square', email: existing?.email || identity.email, businessName: identity.businessName, demo: identity.source === 'demo' })
   await ensureDemoSeed()
   await logActivity({
     kind: 'square',
     entity: 'square',
     entityId: identity.merchantId,
-    summary: check.first ? `Owner account bound to Square (${identity.email || identity.merchantId})` : 'Signed in with Square',
+    summary: check.first ? `Owner account bound to Square (${identity.email || identity.merchantId})` : check.link ? `Square account linked to the owner (${identity.businessName || identity.merchantId})` : 'Signed in with Square',
   })
   return sendRedirect(event, next, 302)
 })

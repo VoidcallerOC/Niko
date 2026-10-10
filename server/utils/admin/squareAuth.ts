@@ -37,12 +37,21 @@ export interface SquareIdentity {
   source: 'square' | 'demo'
 }
 
+/**
+ * The one owner account. Created the first time anyone completes setup
+ * (email + password chosen by Nino) or Sign in with Square. Both halves can
+ * exist: a password owner can later link his Square account, and a Square
+ * owner can add a password in Settings.
+ */
 export interface OwnerBinding {
+  /** Square merchant id once Square is linked, '' before that. */
   merchantId: string
   email: string
   businessName: string
+  /** scrypt hash when a password was set, absent for Square-only owners. */
+  passwordHash?: string
   boundAt: string
-  source: 'square' | 'demo'
+  source: 'square' | 'password' | 'demo'
 }
 
 export interface SquareConnection {
@@ -142,16 +151,28 @@ export const putConnection = (c: SquareConnection) => storage().setItem('square:
 export const removeConnection = () => storage().removeItem('square:connection')
 
 /**
- * Who may sign in. First Square account binds; afterwards the merchant id
- * must match and, when both sides know an email, the email must match too.
+ * Who may sign in with Square.
+ *  - No owner yet: this account becomes the owner.
+ *  - Owner without Square: link it when the Square owner email matches the
+ *    owner's email, or when the owner is already signed in (linking from Settings).
+ *  - Owner with Square: merchant id must match, and the email too when both are known.
  */
-export function checkOwnerBinding(existing: OwnerBinding | null, identity: SquareIdentity): { ok: true; first: boolean } | { ok: false; reason: string } {
-  if (!existing) return { ok: true, first: true }
+export function checkOwnerBinding(
+  existing: OwnerBinding | null,
+  identity: SquareIdentity,
+  signedInOwner = false,
+): { ok: true; first: boolean; link: boolean } | { ok: false; reason: string } {
+  if (!existing) return { ok: true, first: true, link: false }
+  const sameEmail = !!existing.email && !!identity.email && existing.email.toLowerCase() === identity.email.toLowerCase()
+  if (!existing.merchantId) {
+    if (signedInOwner || sameEmail) return { ok: true, first: false, link: true }
+    return { ok: false, reason: 'That Square account does not match the owner email on file. Sign in with your password first, then link Square in Settings.' }
+  }
   if (existing.merchantId !== identity.merchantId) return { ok: false, reason: 'That Square account is not the owner account for this site.' }
-  if (existing.email && identity.email && existing.email.toLowerCase() !== identity.email.toLowerCase()) {
+  if (existing.email && identity.email && !sameEmail) {
     return { ok: false, reason: 'That Square sign-in does not match the owner email on file.' }
   }
-  return { ok: true, first: false }
+  return { ok: true, first: false, link: false }
 }
 
 // --- Square HTTP ------------------------------------------------------------

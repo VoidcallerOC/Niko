@@ -9,7 +9,7 @@ import { assertSameOrigin, getOwnerSession } from '../utils/admin/auth'
  *   direct URL hit fail on the server before any page HTML is rendered.
  * - All admin responses are no-store and noindex.
  */
-const PUBLIC_API = new Set(['/api/admin/auth/login', '/api/admin/auth/session', '/api/admin/auth/logout', '/api/admin/auth/square/start', '/api/admin/auth/square/callback'])
+const PUBLIC_API = new Set(['/api/admin/auth/login', '/api/admin/auth/session', '/api/admin/auth/logout', '/api/admin/auth/setup', '/api/admin/auth/square/start', '/api/admin/auth/square/callback'])
 
 export default defineEventHandler(async (event) => {
   const path = event.path.split('?')[0] ?? ''

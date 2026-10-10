@@ -14,8 +14,10 @@ const props = withDefaults(
     rows?: number
     prefix?: string
     list?: string
+    /** Codes and keys: no auto-capitalising, autocorrect or spellcheck, so phones keep it exactly as typed. */
+    verbatim?: boolean
   }>(),
-  { type: 'text', options: () => [], placeholder: '', hint: '', optional: false, inputmode: undefined, autocomplete: 'off', rows: 3, prefix: '', list: undefined },
+  { type: 'text', options: () => [], placeholder: '', hint: '', optional: false, inputmode: undefined, autocomplete: 'off', rows: 3, prefix: '', list: undefined, verbatim: false },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const id = useId()
@@ -46,7 +48,10 @@ const base = 'w-full rounded-md border border-white/20 bg-nc-char px-3.5 text-ba
         :placeholder="placeholder"
         :autocomplete="autocomplete"
         :list="list"
-        :class="[base, 'min-h-12', prefix ? 'pl-8' : '']"
+        :autocapitalize="verbatim ? 'none' : undefined"
+        :autocorrect="verbatim ? 'off' : undefined"
+        :spellcheck="verbatim ? false : undefined"
+        :class="[base, 'min-h-12', prefix ? 'pl-8' : '', verbatim ? 'font-mono tracking-wide' : '']"
       >
     </div>
     <p v-if="hint" class="mt-1 text-xs text-white/50">{{ hint }}</p>

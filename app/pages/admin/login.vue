@@ -71,7 +71,7 @@ const submit = () => after(() => post('/api/admin/auth/login', { email: email.va
 
       <!-- First visit: create the owner account -->
       <form v-if="session?.methods.setup" class="mt-6 grid gap-4" data-setup @submit.prevent="runSetup">
-        <AdminField v-model="setup.code" label="Setup code" autocomplete="one-time-code" hint="The one-time code from Nick. It stops working once your account exists." />
+        <AdminField v-model="setup.code" label="Setup code" autocomplete="one-time-code" verbatim hint="The one-time code from Nick, exactly as sent (capitals count). It stops working once your account exists." />
         <AdminField v-model="setup.email" label="Your email" type="email" inputmode="email" autocomplete="username" hint="You’ll sign in with this." />
         <AdminField v-model="setup.password" label="Choose a password" type="password" autocomplete="new-password" hint="At least 12 characters. Stored only as a one-way hash." />
         <AdminField v-model="setup.confirm" label="Repeat the password" type="password" autocomplete="new-password" />

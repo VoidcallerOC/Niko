@@ -14,6 +14,27 @@ const busy = ref(false)
 const camera = ref<HTMLInputElement | null>(null)
 const library = ref<HTMLInputElement | null>(null)
 
+/**
+ * Phone cameras produce 3–12 MB images. Shrink to 1600px on the long side as
+ * JPEG before upload so the durable store stays small and uploads are quick on
+ * show-floor data. Falls back to the original file if the browser can't decode it.
+ */
+async function shrink(file: File): Promise<Blob> {
+  try {
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(bitmap.width * scale)
+    canvas.height = Math.round(bitmap.height * scale)
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close()
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82))
+    return blob && blob.size < file.size ? blob : file
+  } catch {
+    return file
+  }
+}
+
 async function onFiles(e: Event) {
   const input = e.target as HTMLInputElement
   const files = Array.from(input.files ?? [])
@@ -24,7 +45,8 @@ async function onFiles(e: Event) {
     const added: PhotoRef[] = []
     for (const file of files.slice(0, 6)) {
       const form = new FormData()
-      form.append('file', file)
+      const blob = await shrink(file)
+      form.append('file', blob, blob === file ? file.name : file.name.replace(/\.[^.]+$/, '') + '.jpg')
       const res = await call<{ id: string; src: string }>('/api/admin/uploads', { body: form })
       if (res) added.push({ id: res.id, src: res.src, alt: '' })
     }
@@ -65,6 +87,6 @@ function makeFirst(id: string) {
     </div>
     <input ref="camera" type="file" accept="image/*" capture="environment" multiple class="sr-only" tabindex="-1" aria-hidden="true" @change="onFiles">
     <input ref="library" type="file" accept="image/jpeg,image/png,image/webp" multiple class="sr-only" tabindex="-1" aria-hidden="true" @change="onFiles">
-    <p class="mt-2 text-xs text-white/50">JPEG, PNG or WebP, up to 10 MB each. The first photo is the one shown on the site.</p>
+    <p class="mt-2 text-xs text-white/50">Photos are resized on your phone before upload. The first photo is the one shown on the site.</p>
   </div>
 </template>

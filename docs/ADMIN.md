@@ -4,19 +4,33 @@ Private, owner-only area at `/admin`. Built on the existing Nuxt 4 / Nitro / Tai
 
 ## Status
 
-Preview build, verified locally in demo mode (desktop 1440 and phone 390/320). Not published. Not connected to any real Square or Instagram account. Nino's real inventory, prices, sales, schedule and account settings were not entered anywhere; the only data in the preview is labelled SAMPLE.
+Ready for a preview trial once Nick sets four things in Vercel (below). Not pushed or deployed. Verified locally against a real Redis server and a mock of Square's OAuth API; never connected to a real Square account. Nino's real inventory, prices, sales, schedule and account settings were not entered anywhere.
 
-## How to run it
+## What Nick configures in Vercel (project `niko`)
+
+The project currently has **no environment variables**. The team has a Redis marketplace integration installed, but it is **not connected to this project**.
+
+| Setting | How | Needed for |
+| --- | --- | --- |
+| `REDIS_URL` | Vercel → project `niko` → Storage → connect a Redis (or Upstash) database. Vercel adds the variable. Pick a free plan if offered; don't buy anything without deciding to. | Everything. Without it the admin stays locked on Vercel. |
+| `NUXT_SESSION_SECRET` | 32+ random characters (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`). | Session cookies and sealing Square tokens. |
+| `NUXT_ADMIN_SETUP_CODE` | 12+ random characters (`node -e "console.log(require('crypto').randomBytes(12).toString('base64url'))"`). Send to Nino privately. | Nino creating his account. |
+| `NUXT_SQUARE_APP_ID`, `NUXT_SQUARE_APP_SECRET`, `NUXT_SQUARE_ENV` | Create an application at developer.squareup.com (free). Use its **Sandbox** credentials and `sandbox` first. On the app's OAuth page add the redirect URL `https://<preview host>/api/admin/auth/square/callback`. | Connect Square (optional). |
+
+Scope each variable to **Preview** first. Add the Production values only when the admin is approved for the live site.
+
+## How to run it locally
 
 ```bash
 npm install
-NUXT_ADMIN_DEMO=1 npm run dev        # demo mode, password: demo-nino
-# or, with a real owner password:
-node scripts/admin-password.mjs      # prints NUXT_ADMIN_PASSWORD_HASH=...
-NUXT_ADMIN_PASSWORD_HASH=... NUXT_SESSION_SECRET=<32+ random chars> npm run dev
+NUXT_ADMIN_DEMO=1 npm run dev          # demo: in-memory SAMPLE data, password demo-nino
+# real flow on local disk:
+NUXT_SESSION_SECRET=<32+ chars> NUXT_ADMIN_SETUP_CODE=<12+ chars> npm run dev
+# real flow on Redis:
+REDIS_URL=redis://127.0.0.1:6379 NUXT_SESSION_SECRET=… NUXT_ADMIN_SETUP_CODE=… npm run dev
 ```
 
-Open `/admin`. Without a session you are redirected to `/admin/login` by the server. Variables are listed in `.env.example`.
+Open `/admin`. Variables are listed in `.env.example`.
 
 ## What is in it
 
@@ -35,16 +49,25 @@ The public homepage reads `/api/site`: featured cards get their own "Cards on th
 
 ## Access control
 
-- **First run, no pre-set password.** With no owner account yet, `/admin/login` shows "Create owner account": Nino enters his email and a password of his choosing (stored only as an scrypt hash, nobody else ever sees it) and is signed in. Alternatively he taps Sign in with Square and that Square account becomes the owner. Either way the first person through claims the account, so on a public URL set `NUXT_ADMIN_SETUP_CODE` and hand Nino the code; setup then requires it. Afterwards sign-in asks for the owner email and password, and Settings → Owner sign-in lets him change the password or link his Square account (a Square account links to a password owner only when its owner email matches, or when he is already signed in).
-- **Session secret** comes from `NUXT_SESSION_SECRET`, or is generated on first start and kept in the admin store, so nothing has to be configured before the first sign-in.
+- **First visit.** With no owner account, `/admin/login` shows "Set up your admin": the setup code, then the email and password Nino chooses. The password is stored only as an scrypt hash. Setup is closed when `NUXT_ADMIN_SETUP_CODE` is missing or shorter than 12 characters, and refuses everything (409) once the account exists, so the code works once. Wrong codes are limited to 5 per address per 15 minutes and 20 site-wide per hour.
+- **After setup, only the owner can sign in**: his email + password, or Sign in with Square once he has connected Square. Another email, another password or another Square account is refused.
+- **Sessions** are h3 sealed cookies (HTTP-only, SameSite Lax, Secure, 12 hours). Each carries the owner id and a session version that the server re-checks on every request. Changing the password signs out every other device; resetting the owner account invalidates all old cookies.
+- `server/middleware/admin-guard.ts` runs before every `/admin` and `/api/admin` request: no session gives 401 for the API (sign-in routes excepted) and a redirect to `/admin/login` for pages. Mutations must be same-origin. Responses are `no-store` and `noindex`.
+- Signed-out visitors learn only which step is open (setup, sign in, or "not ready" with the reason). Owner email, Square link and storage details are returned only to the signed-in owner. No response ever contains the password hash or a Square token.
+- **Recovery** if Nino forgets his password: Nick deletes the key `ninos:admin:owner` in the Redis database, sets a new `NUXT_ADMIN_SETUP_CODE`, redeploys, and Nino runs setup again. Inventory, photos and settings are untouched; Square needs reconnecting.
 
-- **Sign in with Square** (`server/utils/admin/squareAuth.ts`, routes under `server/api/admin/auth/square/`): official Square OAuth. The start route stores a random state in the sealed session cookie and redirects to Square; the callback checks the state, exchanges the code for tokens using the app secret (server only), reads the merchant (business name), the owner's email (Team Members API, `EMPLOYEES_READ`) and the main location, seals the tokens with AES-256-GCM under `NUXT_SESSION_SECRET`, stores them in the admin store, and signs the owner in. **The first Square account to complete this becomes the owner**: its merchant id and email are stored as the admin login. Later sign-ins must match that merchant id, and the email too when both sides know it. Anyone else gets "not the owner account". Needs `NUXT_SQUARE_APP_ID` and `NUXT_SQUARE_APP_SECRET`, and the callback URL registered in the Square developer dashboard.
-- **Password sign-in** (`server/utils/admin/auth.ts`) remains as an alternative: the password is compared against an scrypt hash from `NUXT_ADMIN_PASSWORD_HASH`; the hash never reaches the browser.
-- The session is an h3 sealed cookie: HTTP-only, SameSite=Lax, Secure outside dev, 12-hour lifetime, encrypted with `NUXT_SESSION_SECRET`.
-- `server/middleware/admin-guard.ts` runs before every request: `/api/admin/*` without a session returns 401 (auth endpoints excepted); `/admin/*` pages redirect to `/admin/login` before any HTML renders. `app/middleware/admin.ts` repeats the check for in-app navigation by asking the server. All admin responses are `Cache-Control: no-store` and `X-Robots-Tag: noindex`.
-- Mutations must be same-origin (Origin / Sec-Fetch-Site check); JSON only; 5 failed sign-ins per IP per 15 minutes.
-- Bulk changes require `confirm: true` from the client after a dialog that states the count. Deletes are soft (Trash + Restore). Every overwrite keeps the previous version (10 per record), restorable from the card page.
-- No admin data is bundled client-side; the public API returns listed cards and published events only (no notes, drafts, Square ids).
+## Storage
+
+`server/plugins/admin-storage.ts` mounts one store that every admin read and write goes through:
+
+| Situation | Backend | Notes |
+| --- | --- | --- |
+| `REDIS_URL` (or `KV_URL`) set | Redis via ioredis, keys under `ninos:admin:` | Durable and shared by every Vercel function instance. Owner account, inventory, photos, events, settings, revisions, activity, rate limits and the sealed Square tokens all live here. |
+| On Vercel without Redis | none | Admin locked with a message naming what is missing. Public site unaffected. |
+| Local, no Redis | `.data/admin` on disk | Development only. |
+| Demo mode | memory | SAMPLE data only, wiped on restart, never reads or writes Redis, never contacts Square. Ignored on the production deployment. |
+
+Photos are resized on the phone (1600 px, JPEG) before upload and capped at 4 MB on the server, so they fit comfortably in a free Redis plan. A large catalogue should move photos to Vercel Blob later; nothing else changes.
 
 ## What came from which source
 
@@ -68,11 +91,12 @@ The public homepage reads `/api/site`: featured cards get their own "Cards on th
 
 ## Square
 
-- Access comes from the OAuth grant made at sign-in (tokens sealed in the store, refreshed automatically within a week of expiry, revoked on Disconnect). A personal access token in `NUXT_SQUARE_ACCESS_TOKEN` still works as a self-hosted fallback. The location used for inventory counts is the merchant's main active location, read at connect time.
-- Optional. Without a connection the Square page explains how to connect and everything else works.
-- With a token: Preview lists (1) Square items not yet linked here, importable as drafts; (2) field-by-field differences on linked cards with both values shown; (3) listed cards that could be pushed. Apply performs only what was ticked and confirmed, matches by stored Square id (never by name guesses), upserts in place with idempotency keys, and never deletes on either side.
-- In demo mode a labelled SAMPLE catalog stands in so the flow can be previewed; no real account is contacted.
-- Needs from Nino before enabling: a Square developer access token for his account (sandbox first), the location id, and approval of what pushes mean for his Square Online storefront.
+- **Connect from the admin.** On Square → Connect Square, Nino is sent to Square's own sign-in and approval page. His Square password never touches this site. Square sends him back with a one-time code; the server exchanges it using the app secret, reads his business name, owner email and main location, and stores the access and refresh tokens sealed with AES-256-GCM under a key derived from `NUXT_SESSION_SECRET`. That key lives only in the environment, never in Redis, so the database alone does not reveal the tokens. Tokens refresh automatically within a week of expiry. No token ever reaches the browser.
+- **Sign in with Square** appears on the login page only after he has connected Square, and accepts only that merchant.
+- **One Square account at a time.** Connecting a different account while one is linked is refused ("disconnect first"); tokens from any refused attempt are revoked at Square immediately.
+- **Disconnect** revokes the app's access at Square, deletes the stored tokens and unlinks the merchant. Email + password keep working; cards keep their Square item ids.
+- **Sync** (preview, per-field conflicts, confirm before apply, no deletes, no duplicates) runs only on that OAuth connection, through the official Catalog and Inventory APIs. There is no pasted-token path.
+- **Demo mode** uses a labelled SAMPLE Square account and catalog and makes no network calls to Square.
 
 ## Instagram
 
@@ -82,15 +106,14 @@ The public homepage reads `/api/site`: featured cards get their own "Cards on th
 
 ## Needs Nino's approval or credentials
 
-1. Nothing for sign-in itself: Nino creates the owner account on his first visit. Recommended: `NUXT_ADMIN_SETUP_CODE` (give him the code) and `NUXT_SESSION_SECRET` on Vercel so sessions survive cold starts.
-2. Durable storage before real inventory: the preview uses the filesystem (`server/plugins/admin-storage.ts`). Vercel's function filesystem does not persist between deployments or instances. Swap the driver for Vercel Blob/KV, Redis or S3 (one file change) and add its credentials.
-3. A Square application (app id + secret, callback URL registered) so Nino can sign in and connect with his own Square login. Sandbox first.
-4. Instagram Graph API app approval (optional).
-5. Public copy, featured cards and events: entered by Nino, nothing pre-filled.
-6. Whether the admin should go live on the production domain at all; it is currently unpublished.
+1. Nick: the four Vercel settings above (Redis connection, session secret, setup code, Square sandbox app).
+2. Nino: his own email and password at first setup, and approving the Square connection on Square's page. Nobody else needs either.
+3. Nino: moving Square from sandbox to his real account is his decision; it needs the app's Production credentials and `NUXT_SQUARE_ENV=production`.
+4. Public copy, featured cards and events: entered by Nino, nothing pre-filled.
+5. Whether the admin goes live on the production domain at all.
 
 ## Verification performed
 
-- `npm run typecheck`, `npm run build`, `npm test` (OnTreasure parser, password hashing, validators).
-- Server checks with curl in demo mode: 401 on unauthenticated API, 302 on unauthenticated pages, 403 on cross-origin POST, 429 after 5 failed sign-ins, HTTP-only session cookie, listing without a price rejected, bulk without confirm rejected, trash/restore, upload type sniffing (text file rejected), Square preview/apply with no duplicate on re-apply, public `/api/site` carrying only listed/published data.
-- Playwright on 390×844 (touch) and 1440×900: redirect to login, wrong-password message, sign-in, quantity tap with feedback, mark sold, bulk hide with confirmation, dashboard, new card save, scan → draft with uploaded photo, event pre-fill from OnTreasure, Instagram hide/show, Square preview with conflicts, settings, sign-out re-protects. No horizontal overflow at 320/390; interactive targets ≥ 44 px.
+- `npm run typecheck`, `npm run build`, `NITRO_PRESET=vercel npm run build` (ioredis bundled in the function), `npm test` (27 unit tests).
+- End-to-end against a real Redis (append-only persistence) and a local mock of Square's OAuth, merchant, team-member, location, catalog, inventory and revoke endpoints: 71 checks covering locked states (Vercel without Redis, missing setup code), setup with missing, wrong, right and reused codes, owner-only sign-in, forged cookies and cross-site posts, Square connect, sign-in, wrong-merchant refusal with immediate revoke, disconnect and reconnect, survival of session, owner, cards, photo bytes, settings and the sealed Square connection across an app restart and an app + Redis restart, password change signing out other sessions, shared rate limits, and demo mode writing nothing to Redis and calling nothing at Square.
+- Playwright at 390 px: setup with a wrong then right code, dashboard storage card, Connect Square round trip and toast, Disconnect dialog, Settings owner panel, Sign in with Square, email + password sign-in, no horizontal overflow on any admin page, no hydration warnings. Demo-mode admin regression and the public homepage audit (1440/768/390/320) still pass.

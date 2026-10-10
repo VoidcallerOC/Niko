@@ -1,33 +1,42 @@
 import { authConfig, getOwnerSession } from '../../../utils/admin/auth'
-import { getOwnerBinding, squareLoginAvailable, squareLoginIsDemo } from '../../../utils/admin/squareAuth'
+import { configuredSetupCode, getOwner } from '../../../utils/admin/owner'
+import { squareSetupProblems } from '../../../utils/admin/squareAuth'
+import { storageStatus } from '../../../utils/admin/runtime'
 
-/** Safe to call signed-out: tells the login page which sign-in methods exist. */
+/**
+ * Safe to call signed out: tells the login page which steps are open. Only a
+ * signed-in owner sees the owner email, Square link and storage details.
+ */
 export default defineEventHandler(async (event) => {
   const cfg = authConfig()
   const session = await getOwnerSession(event)
-  const binding = await getOwnerBinding().catch(() => null)
-  const square = squareLoginAvailable() && !!cfg.secret
-  const password = cfg.mode === 'demo' || cfg.mode === 'password' || !!binding?.passwordHash
-  const setup = cfg.mode === 'owner' && !binding
+  const owner = cfg.mode === 'owner' ? await getOwner().catch(() => null) : null
+  const demo = cfg.mode === 'demo'
+  const squareReady = !demo && squareSetupProblems().length === 0
+  const setupCode = !!configuredSetupCode()
+
+  let blocked: string | null = null
+  if (cfg.mode === 'unconfigured') blocked = cfg.reason ?? 'The admin is not configured.'
+  else if (cfg.mode === 'owner' && !owner && !setupCode) blocked = 'Setup is closed until Nick sets NUXT_ADMIN_SETUP_CODE (at least 12 characters) and redeploys.'
+
+  const storage = storageStatus()
   return {
     signedIn: !!session,
-    mode: cfg.mode,
-    reason: cfg.mode === 'unconfigured' ? cfg.reason ?? null : null,
-    demo: cfg.mode === 'demo',
-    signedInAt: session?.data.signedInAt ?? null,
-    via: session?.data.via ?? null,
-    email: session?.data.email ?? null,
+    demo,
+    blocked,
     methods: {
-      password,
-      /** Password sign-in asks for the owner email as well. */
-      emailRequired: !!binding?.passwordHash,
-      square,
-      squareDemo: square && squareLoginIsDemo(),
-      setup,
-      setupCodeRequired: setup && !!String(useRuntimeConfig().adminSetupCode || ''),
+      setup: cfg.mode === 'owner' && !owner && setupCode,
+      password: demo || !!owner,
+      square: squareReady && !!owner?.merchantId,
     },
-    owner: binding
-      ? { bound: true, email: binding.email, businessName: binding.businessName, boundAt: binding.boundAt, source: binding.source, hasPassword: !!binding.passwordHash, squareLinked: !!binding.merchantId }
-      : { bound: false },
+    ...(session
+      ? {
+          email: session.data.email ?? null,
+          via: session.data.via ?? null,
+          owner: owner ? { email: owner.email, squareLinked: !!owner.merchantId, businessName: owner.businessName, createdAt: owner.createdAt } : null,
+          storage: { backend: storage.backend, durable: storage.durable, label: storage.label },
+          square: { ready: squareReady || demo, problems: demo ? [] : squareSetupProblems() },
+        }
+      : {}),
   }
 })

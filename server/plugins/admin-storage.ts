@@ -1,32 +1,35 @@
-import { randomBytes } from 'node:crypto'
 import fsDriver from 'unstorage/drivers/fs'
+import memoryDriver from 'unstorage/drivers/memory'
+import redisDriver from 'unstorage/drivers/redis'
+import { chooseBackend, redisUrl, setStorageStatus } from '../utils/admin/runtime'
 
 /**
- * Mount the admin store at runtime so the location follows the environment
- * (NUXT_ADMIN_DATA_DIR) rather than being fixed at build time.
- *
- * Preview: filesystem. Vercel's function filesystem is ephemeral, so before
- * real inventory goes in, swap this driver for a durable one (Vercel Blob/KV,
- * Redis, S3: see https://unstorage.unjs.io/drivers) with its credentials in
- * server env vars. Every reader goes through useStorage('admin'), so only
- * this file changes.
- *
- * Session secret: NUXT_SESSION_SECRET when set; otherwise one is generated on
- * first start and kept in the store, so nothing has to be configured before
- * Nino's first sign-in. (On an ephemeral filesystem that secret is regenerated
- * on each cold start, which only signs everyone out.)
+ * Mount the admin store. Every admin reader and writer goes through
+ * useStorage('admin'), so this is the only place that knows the backend.
+ * See server/utils/admin/runtime.ts for how the backend is chosen.
  */
-export default defineNitroPlugin(async () => {
-  const base = process.env.NUXT_ADMIN_DATA_DIR || '.data/admin'
-  useStorage().mount('admin', fsDriver({ base }))
+export default defineNitroPlugin(() => {
+  const status = chooseBackend()
+  setStorageStatus(status)
+  const storage = useStorage()
 
-  const configured = String(useRuntimeConfig().sessionSecret || '')
-  if (configured.length >= 32) return
-  const store = useStorage('admin')
-  let secret = await store.getItem<string>('session:secret').catch(() => null)
-  if (typeof secret !== 'string' || secret.length < 32) {
-    secret = randomBytes(32).toString('hex')
-    await store.setItem('session:secret', secret)
+  if (status.backend === 'redis') {
+    storage.mount('admin', redisDriver({
+      url: redisUrl(),
+      base: 'ninos:admin',
+      // Serverless-friendly: fail fast instead of queueing forever.
+      maxRetriesPerRequest: 2,
+      connectTimeout: 5000,
+      enableReadyCheck: true,
+    }))
+  } else if (status.backend === 'fs') {
+    storage.mount('admin', fsDriver({ base: process.env.NUXT_ADMIN_DATA_DIR || '.data/admin' }))
+  } else {
+    // Demo, or Vercel without Redis: memory only. Demo data is SAMPLE-only and
+    // never touches the real store; without Redis the admin is locked anyway.
+    storage.mount('admin', memoryDriver())
   }
-  ;(globalThis as { __ncSessionSecret?: string }).__ncSessionSecret = secret
+
+  if (status.problem) console.warn(`[admin] ${status.problem}`)
+  else console.info(`[admin] storage: ${status.label}`)
 })

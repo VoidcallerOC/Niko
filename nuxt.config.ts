@@ -35,16 +35,17 @@ export default defineNuxtConfig({
     strict: true,
   },
   // Admin records and uploads are mounted at runtime in server/plugins/admin-storage.ts.
-  // Server-only secrets. Each maps to an env var: NUXT_SESSION_SECRET,
-  // NUXT_ADMIN_PASSWORD_HASH, NUXT_ADMIN_DEMO, NUXT_SQUARE_APP_ID,
-  // NUXT_SQUARE_APP_SECRET, NUXT_SQUARE_ENV, NUXT_SQUARE_REDIRECT_URL,
-  // NUXT_SQUARE_ACCESS_TOKEN, NUXT_SQUARE_LOCATION_ID. None reach the client.
+  // Server-only settings, each from an env var. None are sent to the browser.
+  //   NUXT_SESSION_SECRET      seals session cookies and Square tokens
+  //   NUXT_ADMIN_SETUP_CODE    one-time code Nino enters to create the owner account
+  //   NUXT_ADMIN_DEMO          1 = demo mode (in-memory SAMPLE data only)
+  //   NUXT_SQUARE_APP_ID / NUXT_SQUARE_APP_SECRET / NUXT_SQUARE_ENV / NUXT_SQUARE_REDIRECT_URL
+  // Storage: REDIS_URL (or KV_URL), read directly by server/plugins/admin-storage.ts.
   runtimeConfig: {
     sessionSecret: '',
-    adminPasswordHash: '',
     adminDemo: '',
-    // Optional one-time code required to create the owner account (NUXT_ADMIN_SETUP_CODE).
     adminSetupCode: '',
-    square: { appId: '', appSecret: '', env: '', redirectUrl: '', accessToken: '', locationId: '' },
+    square: { appId: '', appSecret: '', env: '', redirectUrl: '' },
   },
+
 })

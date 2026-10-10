@@ -1,4 +1,5 @@
 import { assertSameOrigin, getOwnerSession } from '../utils/admin/auth'
+import { ensureSessionSecret } from '../utils/admin/runtime'
 
 /**
  * Server-side gate for everything under /admin and /api/admin.
@@ -19,6 +20,14 @@ export default defineEventHandler(async (event) => {
 
   setHeader(event, 'Cache-Control', 'no-store')
   setHeader(event, 'X-Robots-Tag', 'noindex, nofollow')
+
+  // Load (or create) the session secret before anything reads a cookie.
+  try {
+    await ensureSessionSecret()
+  } catch (error) {
+    console.error('[admin] session secret unavailable:', error instanceof Error ? error.message : error)
+    throw createError({ statusCode: 503, statusMessage: 'Admin storage is unreachable. Try again shortly.' })
+  }
 
   if (isApi) {
     assertSameOrigin(event)

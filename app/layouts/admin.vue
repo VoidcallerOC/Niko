@@ -27,7 +27,7 @@ const quick = [
 ]
 const active = (to: string, exact = false) => (exact ? route.path === to : route.path === to || route.path.startsWith(to + '/'))
 
-const { data: session } = await useAsyncData('admin-session', () => useRequestFetch()<{ signedIn: boolean; demo: boolean }>('/api/admin/auth/session'))
+const { data: session } = await useAdminSession()
 
 async function signOut() {
   await call('/api/admin/auth/logout')
@@ -69,7 +69,7 @@ useHead({ title: 'Admin — Nino’s Collectibles', meta: [{ name: 'robots', con
 
     <main id="admin-main" tabindex="-1" class="wrap pt-6 pb-28 sm:pb-16">
       <div v-if="session?.demo" class="mb-5 rounded-md border border-nc-red/60 bg-nc-red/10 px-4 py-3 text-sm text-white/90">
-        <strong>Demo mode.</strong> Everything here is labelled SAMPLE data for previewing the interface. It is not Nino’s inventory, pricing, sales or schedule.
+        <strong>Demo mode.</strong> Everything here is labelled SAMPLE data, kept in memory and wiped on restart. It is not Nino’s inventory, pricing, sales or schedule, and no real Square account is contacted.
       </div>
       <slot />
     </main>

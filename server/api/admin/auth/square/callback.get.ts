@@ -1,70 +1,73 @@
-import { anonymousSession, getOwnerSession, signInOwner } from '../../../../utils/admin/auth'
+import { anonymousSession, getOwnerSession, signInAsOwner } from '../../../../utils/admin/auth'
+import { checkSquareAccess, getOwner, putOwner } from '../../../../utils/admin/owner'
 import { logActivity, nowIso } from '../../../../utils/admin/store'
-import { ensureDemoSeed } from '../../../../utils/admin/demo'
 import {
-  DEMO_IDENTITY, checkOwnerBinding, exchangeCode, fetchIdentity, getOwnerBinding, putConnection, putOwnerBinding,
-  redirectUrlFor, seal, squareLoginIsDemo, type SquareIdentity,
+  DEMO_IDENTITY, exchangeCode, fetchIdentity, putConnection, redirectUrlFor, revokeTokens, seal, squareIsDemo, type SquareIdentity,
 } from '../../../../utils/admin/squareAuth'
 
-const fail = (event: Parameters<typeof sendRedirect>[0], code: string) => sendRedirect(event, `/admin/login?error=${encodeURIComponent(code)}`, 302)
-
+/** Square sends the browser back here with ?code&state (or ?error). */
 export default defineEventHandler(async (event) => {
   const q = getQuery(event)
   const session = await anonymousSession(event)
-  const expected = session.data.oauthState
-  const next = session.data.oauthNext || '/admin'
-  await session.update({ oauthState: undefined, oauthNext: undefined })
+  const { oauthState: expected, oauthNext, oauthIntent } = session.data
+  await session.update({ oauthState: undefined, oauthNext: undefined, oauthIntent: undefined })
+  const intent = oauthIntent === 'connect' ? 'connect' : 'signin'
+  const next = oauthNext || (intent === 'connect' ? '/admin/square' : '/admin')
+  const fail = (code: string) => sendRedirect(event, `${intent === 'connect' ? '/admin/square' : '/admin/login'}?error=${encodeURIComponent(code)}`, 302)
 
-  if (typeof q.error === 'string') return fail(event, q.error === 'access_denied' ? 'denied' : 'square')
-  if (!expected || q.state !== expected) return fail(event, 'state')
+  if (typeof q.error === 'string') return fail(q.error === 'access_denied' ? 'denied' : 'square')
+  if (!expected || q.state !== expected) return fail('state')
 
+  // --- Demo: SAMPLE identity, memory store, no network ----------------------
+  if (squareIsDemo()) {
+    if (q.demo !== '1' || intent !== 'connect' || !(await getOwnerSession(event))) return fail('state')
+    await putConnection({ sealed: '', expiresAt: '', ...sample(DEMO_IDENTITY), connectedAt: nowIso(), source: 'demo' })
+    await logActivity({ kind: 'square', entity: 'square', entityId: DEMO_IDENTITY.merchantId, summary: 'Demo: SAMPLE Square account connected' })
+    return sendRedirect(event, `${next}${next.includes('?') ? '&' : '?'}connected=1`, 302)
+  }
+
+  // --- Real Square ----------------------------------------------------------
+  if (typeof q.code !== 'string' || !q.code) return fail('square')
   let identity: SquareIdentity
-  let sealed = ''
-  let expiresAt = ''
-  if (q.demo === '1' && squareLoginIsDemo()) {
-    identity = DEMO_IDENTITY
-  } else {
-    if (typeof q.code !== 'string' || !q.code) return fail(event, 'square')
-    try {
-      const tokens = await exchangeCode(q.code, redirectUrlFor(event))
-      identity = await fetchIdentity(tokens.accessToken, tokens.merchantId)
-      sealed = seal({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken })
-      expiresAt = tokens.expiresAt
-    } catch (error) {
-      console.error('[square oauth]', error instanceof Error ? error.message : error)
-      return fail(event, 'square')
-    }
+  let tokens: Awaited<ReturnType<typeof exchangeCode>>
+  try {
+    tokens = await exchangeCode(q.code, redirectUrlFor(event))
+    identity = await fetchIdentity(tokens.accessToken, tokens.merchantId)
+  } catch (error) {
+    console.error('[square oauth]', error instanceof Error ? error.message : error)
+    return fail('square')
   }
 
-  const existing = await getOwnerBinding()
-  const signedIn = !!(await getOwnerSession(event))
-  const check = checkOwnerBinding(existing, identity, signedIn)
-  if (!check.ok) return fail(event, existing && !existing.merchantId ? 'linkemail' : 'notowner')
-
-  const now = nowIso()
-  if (check.first) {
-    await putOwnerBinding({ merchantId: identity.merchantId, email: identity.email, businessName: identity.businessName, boundAt: now, source: identity.source })
-  } else if (check.link && existing) {
-    await putOwnerBinding({ ...existing, merchantId: identity.merchantId, businessName: identity.businessName || existing.businessName, email: existing.email || identity.email })
+  const owner = await getOwner()
+  const signedIn = intent === 'connect' && !!(await getOwnerSession(event))
+  if (intent === 'connect' && !signedIn) return fail('signedout')
+  const check = checkSquareAccess(owner, identity, intent)
+  if (!check.ok || !owner) {
+    // Do not keep access we are not going to use.
+    await revokeTokens(tokens.accessToken)
+    return fail(check.ok ? 'noowner' : check.code)
   }
+
   await putConnection({
-    sealed,
-    expiresAt,
-    merchantId: identity.merchantId,
-    businessName: identity.businessName,
-    email: identity.email,
-    locationId: identity.locationId,
-    locationName: identity.locationName,
-    connectedAt: now,
-    source: identity.source,
+    sealed: seal({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }),
+    expiresAt: tokens.expiresAt,
+    ...sample(identity),
+    connectedAt: nowIso(),
+    source: 'square',
   })
-  await signInOwner(event, { via: 'square', email: existing?.email || identity.email, businessName: identity.businessName, demo: identity.source === 'demo' })
-  await ensureDemoSeed()
+  if (!owner.merchantId || owner.businessName !== identity.businessName) {
+    await putOwner({ ...owner, merchantId: identity.merchantId, businessName: identity.businessName })
+  }
+  if (intent === 'signin') await signInAsOwner(event, owner, 'square')
   await logActivity({
     kind: 'square',
     entity: 'square',
     entityId: identity.merchantId,
-    summary: check.first ? `Owner account bound to Square (${identity.email || identity.merchantId})` : check.link ? `Square account linked to the owner (${identity.businessName || identity.merchantId})` : 'Signed in with Square',
+    summary: intent === 'connect' ? `Square connected (${identity.businessName || identity.merchantId})` : 'Signed in with Square',
   })
-  return sendRedirect(event, next, 302)
+  return sendRedirect(event, intent === 'connect' ? `${next}${next.includes('?') ? '&' : '?'}connected=1` : next, 302)
 })
+
+function sample(i: SquareIdentity) {
+  return { merchantId: i.merchantId, businessName: i.businessName, email: i.email, locationId: i.locationId, locationName: i.locationName }
+}

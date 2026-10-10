@@ -7,7 +7,7 @@ Not published or deployed.
 
 **Owner admin (preview):** a private area at `/admin` for inventory, scanning, events, Instagram and
 Square controls, and site settings. See [docs/ADMIN.md](docs/ADMIN.md) for what it does, how sign-in
-works, what was reused from other projects, and what still needs Nino's credentials. Run it locally with
+works, what was reused from other projects, and what Nick must set in Vercel first. Run it locally with
 `NUXT_ADMIN_DEMO=1 npm run dev` (password `demo-nino`, labelled sample data only).
 
 ## Run it

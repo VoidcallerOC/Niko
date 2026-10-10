@@ -1,5 +1,4 @@
-import { signIn, authConfig } from '../../../utils/admin/auth'
-import { getOwnerBinding } from '../../../utils/admin/squareAuth'
+import { signInWithPassword, authConfig } from '../../../utils/admin/auth'
 import { ensureDemoSeed } from '../../../utils/admin/demo'
 
 export default defineEventHandler(async (event) => {
@@ -7,8 +6,7 @@ export default defineEventHandler(async (event) => {
   const password = typeof body?.password === 'string' ? body.password : ''
   const email = typeof body?.email === 'string' ? body.email : ''
   if (!password) throw createError({ statusCode: 400, statusMessage: 'Enter the password.' })
-  const owner = await getOwnerBinding().catch(() => null)
-  await signIn(event, email, password, owner ? { email: owner.email, passwordHash: owner.passwordHash } : null)
+  await signInWithPassword(event, email, password)
   await ensureDemoSeed()
   return { ok: true, demo: authConfig().mode === 'demo' }
 })

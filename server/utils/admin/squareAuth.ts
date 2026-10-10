@@ -1,26 +1,28 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 import type { H3Event } from 'h3'
-import { isDemo } from './auth'
+import { envSessionSecret, isDemoEnv } from './runtime'
 
 /**
  * Square OAuth (official): https://developer.squareup.com/docs/oauth-api/overview
  *
- *  1. /api/admin/auth/square/start   → redirect to Square's authorize page with
- *     a random `state` kept in the sealed session cookie.
- *  2. Nino approves; Square sends him back to
- *     /api/admin/auth/square/callback?code=…&state=…
- *  3. The server exchanges the code for tokens using the app secret (server
- *     only), reads who the merchant is (business name, owner email, main
- *     location), stores the tokens sealed with NUXT_SESSION_SECRET, and signs
- *     him in. The browser never sees a token.
+ * Connect (from inside the admin, owner signed in):
+ *   /api/admin/auth/square/start → Square's authorize page → Nino approves on
+ *   Square's own site (his Square password never touches this app) →
+ *   /api/admin/auth/square/callback exchanges the code on the server, reads the
+ *   merchant, owner email and main location, and stores the tokens sealed with
+ *   AES-256-GCM under a key derived from NUXT_SESSION_SECRET. That key is an
+ *   environment variable, never written to the store, so a copy of the
+ *   database alone does not reveal the tokens. The browser never sees a token.
  *
- * Owner binding: the first Square account to complete this flow becomes the
- * owner (merchant id + owner email are stored). Later sign-ins must match it.
+ * Sign in with Square (signed out): same round trip; accepted only for the
+ * merchant already linked to the owner account.
+ *
+ * Demo mode never contacts Square: a labelled SAMPLE identity stands in.
  *
  * Env: NUXT_SQUARE_APP_ID, NUXT_SQUARE_APP_SECRET, NUXT_SQUARE_ENV
- * (sandbox|production), optional NUXT_SQUARE_REDIRECT_URL (defaults to this
- * site's /api/admin/auth/square/callback, which must be registered in the
- * Square developer dashboard).
+ * (sandbox|production), NUXT_SESSION_SECRET, optional NUXT_SQUARE_REDIRECT_URL.
+ * NUXT_SQUARE_API_ORIGIN / NUXT_SQUARE_AUTHORIZE_URL exist only so the flow
+ * can be tested against a local mock; leave them unset on Vercel.
  */
 
 export const SQUARE_SCOPES = ['MERCHANT_PROFILE_READ', 'EMPLOYEES_READ', 'ITEMS_READ', 'ITEMS_WRITE', 'INVENTORY_READ', 'INVENTORY_WRITE']
@@ -29,33 +31,15 @@ export const SQUARE_VERSION = '2025-01-23'
 export interface SquareIdentity {
   merchantId: string
   businessName: string
-  /** Owner's email from the Team Members API, '' when the scope was not granted. */
+  /** Owner's email from the Team Members API; '' when not available. */
   email: string
   locationId: string
   locationName: string
-  /** 'demo' identities are labelled samples; never a real account. */
   source: 'square' | 'demo'
 }
 
-/**
- * The one owner account. Created the first time anyone completes setup
- * (email + password chosen by Nino) or Sign in with Square. Both halves can
- * exist: a password owner can later link his Square account, and a Square
- * owner can add a password in Settings.
- */
-export interface OwnerBinding {
-  /** Square merchant id once Square is linked, '' before that. */
-  merchantId: string
-  email: string
-  businessName: string
-  /** scrypt hash when a password was set, absent for Square-only owners. */
-  passwordHash?: string
-  boundAt: string
-  source: 'square' | 'password' | 'demo'
-}
-
 export interface SquareConnection {
-  /** Sealed (AES-256-GCM) access + refresh tokens; see seal()/unseal(). */
+  /** Sealed access + refresh tokens (see seal/unseal). Empty for demo. */
   sealed: string
   expiresAt: string
   merchantId: string
@@ -74,30 +58,28 @@ interface Tokens {
 
 export function squareAuthConfig() {
   const cfg = useRuntimeConfig()
-  const appId = String(cfg.square?.appId || process.env.SQUARE_APPLICATION_ID || '')
-  const appSecret = String(cfg.square?.appSecret || process.env.SQUARE_APPLICATION_SECRET || '')
-  const env = String(cfg.square?.env || process.env.SQUARE_ENV || 'production')
-  const redirectUrl = String(cfg.square?.redirectUrl || '')
+  const env = String(cfg.square?.env || 'production') === 'sandbox' ? 'sandbox' : 'production'
   return {
-    appId,
-    appSecret,
+    appId: String(cfg.square?.appId || ''),
+    appSecret: String(cfg.square?.appSecret || ''),
     env,
-    redirectUrl,
-    api: env === 'sandbox' ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com',
-    authorize: env === 'sandbox' ? 'https://app.squareupsandbox.com/oauth2/authorize' : 'https://connect.squareup.com/oauth2/authorize',
+    redirectUrl: String(cfg.square?.redirectUrl || ''),
+    api: process.env.NUXT_SQUARE_API_ORIGIN || (env === 'sandbox' ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com'),
+    authorize: process.env.NUXT_SQUARE_AUTHORIZE_URL || (env === 'sandbox' ? 'https://app.squareupsandbox.com/oauth2/authorize' : 'https://connect.squareup.com/oauth2/authorize'),
   }
 }
 
-/** Real Square sign-in needs an app id and secret. Demo mode offers a labelled stand-in. */
-export function squareLoginAvailable() {
+/** What is still missing before a real Square account can be connected. Names only, never values. */
+export function squareSetupProblems(): string[] {
   const { appId, appSecret } = squareAuthConfig()
-  return (!!appId && !!appSecret) || isDemo()
+  const missing: string[] = []
+  if (!appId) missing.push('NUXT_SQUARE_APP_ID')
+  if (!appSecret) missing.push('NUXT_SQUARE_APP_SECRET')
+  if (!envSessionSecret()) missing.push('NUXT_SESSION_SECRET (32+ characters; seals the Square tokens)')
+  return missing
 }
 
-export function squareLoginIsDemo() {
-  const { appId, appSecret } = squareAuthConfig()
-  return isDemo() && !(appId && appSecret)
-}
+export const squareIsDemo = () => isDemoEnv()
 
 export function redirectUrlFor(event: H3Event) {
   const configured = squareAuthConfig().redirectUrl
@@ -109,20 +91,14 @@ export function redirectUrlFor(event: H3Event) {
 
 export function authorizeUrl(state: string, redirectUri: string) {
   const { appId, authorize } = squareAuthConfig()
-  const params = new URLSearchParams({
-    client_id: appId,
-    scope: SQUARE_SCOPES.join(' '),
-    session: 'false',
-    state,
-    redirect_uri: redirectUri,
-  })
+  const params = new URLSearchParams({ client_id: appId, scope: SQUARE_SCOPES.join(' '), session: 'false', state, redirect_uri: redirectUri })
   return `${authorize}?${params}`
 }
 
-// --- Token sealing --------------------------------------------------------
+// --- Token sealing (key from the environment, never stored) -----------------
 function key() {
-  const secret = String(useRuntimeConfig().sessionSecret || '')
-  if (secret.length < 32) throw createError({ statusCode: 503, statusMessage: 'NUXT_SESSION_SECRET is required to store Square tokens.' })
+  const secret = envSessionSecret()
+  if (!secret) throw createError({ statusCode: 503, statusMessage: 'NUXT_SESSION_SECRET must be set before Square can be connected.' })
   return createHash('sha256').update(`square-tokens:${secret}`).digest()
 }
 
@@ -142,41 +118,14 @@ export function unseal(sealed: string): Tokens {
   return JSON.parse(json) as Tokens
 }
 
-// --- Storage ----------------------------------------------------------------
+// --- Connection record ------------------------------------------------------
 const storage = () => useStorage('admin')
-export const getOwnerBinding = () => storage().getItem<OwnerBinding>('owner')
-export const putOwnerBinding = (b: OwnerBinding) => storage().setItem('owner', b)
 export const getConnection = () => storage().getItem<SquareConnection>('square:connection')
 export const putConnection = (c: SquareConnection) => storage().setItem('square:connection', c)
 export const removeConnection = () => storage().removeItem('square:connection')
 
-/**
- * Who may sign in with Square.
- *  - No owner yet: this account becomes the owner.
- *  - Owner without Square: link it when the Square owner email matches the
- *    owner's email, or when the owner is already signed in (linking from Settings).
- *  - Owner with Square: merchant id must match, and the email too when both are known.
- */
-export function checkOwnerBinding(
-  existing: OwnerBinding | null,
-  identity: SquareIdentity,
-  signedInOwner = false,
-): { ok: true; first: boolean; link: boolean } | { ok: false; reason: string } {
-  if (!existing) return { ok: true, first: true, link: false }
-  const sameEmail = !!existing.email && !!identity.email && existing.email.toLowerCase() === identity.email.toLowerCase()
-  if (!existing.merchantId) {
-    if (signedInOwner || sameEmail) return { ok: true, first: false, link: true }
-    return { ok: false, reason: 'That Square account does not match the owner email on file. Sign in with your password first, then link Square in Settings.' }
-  }
-  if (existing.merchantId !== identity.merchantId) return { ok: false, reason: 'That Square account is not the owner account for this site.' }
-  if (existing.email && identity.email && !sameEmail) {
-    return { ok: false, reason: 'That Square sign-in does not match the owner email on file.' }
-  }
-  return { ok: true, first: false, link: false }
-}
-
 // --- Square HTTP ------------------------------------------------------------
-async function squareJson<T>(path: string, init: { method?: string; body?: unknown; token?: string }): Promise<T> {
+async function squareJson<T>(path: string, init: { method?: string; body?: unknown; token?: string; auth?: string }): Promise<T> {
   const { api } = squareAuthConfig()
   const res = await fetch(`${api}${path}`, {
     method: init.method ?? 'GET',
@@ -184,7 +133,7 @@ async function squareJson<T>(path: string, init: { method?: string; body?: unkno
       'Square-Version': SQUARE_VERSION,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      ...(init.token ? { Authorization: `Bearer ${init.token}` } : {}),
+      ...(init.token ? { Authorization: `Bearer ${init.token}` } : init.auth ? { Authorization: init.auth } : {}),
     },
     body: init.body ? JSON.stringify(init.body) : undefined,
   })
@@ -221,13 +170,15 @@ export async function refreshTokens(refreshToken: string) {
   return { accessToken: t.access_token, refreshToken: t.refresh_token ?? refreshToken, expiresAt: t.expires_at ?? '' }
 }
 
+/** Revoke this app's access for the merchant. Returns false if Square refused or was unreachable. */
 export async function revokeTokens(accessToken: string) {
-  const { appId, appSecret, api } = squareAuthConfig()
-  await fetch(`${api}/oauth2/revoke`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Square-Version': SQUARE_VERSION, Authorization: `Client ${appSecret}` },
-    body: JSON.stringify({ client_id: appId, access_token: accessToken }),
-  }).catch(() => undefined)
+  const { appId, appSecret } = squareAuthConfig()
+  try {
+    await squareJson('/oauth2/revoke', { method: 'POST', auth: `Client ${appSecret}`, body: { client_id: appId, access_token: accessToken } })
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Business name, owner email and main location for the merchant behind a token. */
@@ -238,14 +189,14 @@ export async function fetchIdentity(accessToken: string, merchantIdHint = ''): P
 
   let email = ''
   try {
-    const team = await squareJson<{ team_members?: Array<{ is_owner?: boolean; email_address?: string; status?: string }> }>('/v2/team-members/search', {
+    const team = await squareJson<{ team_members?: Array<{ is_owner?: boolean; email_address?: string }> }>('/v2/team-members/search', {
       method: 'POST',
       token: accessToken,
       body: { query: { filter: { status: 'ACTIVE' } }, limit: 100 },
     })
     email = team.team_members?.find((m) => m.is_owner)?.email_address ?? ''
   } catch {
-    email = '' // EMPLOYEES_READ not granted; merchant id still binds the owner.
+    email = '' // EMPLOYEES_READ not granted; the merchant id still identifies him.
   }
 
   let locationId = me.merchant?.main_location_id ?? ''
@@ -275,11 +226,12 @@ export const DEMO_IDENTITY: SquareIdentity = {
 
 /**
  * A usable access token for the Square APIs, refreshed when it is within a
- * week of expiry. Null when Square is not connected through OAuth.
+ * week of expiry. Null when no real Square account is connected.
  */
 export async function connectedAccessToken(): Promise<{ token: string; locationId: string } | null> {
+  if (isDemoEnv()) return null
   const conn = await getConnection()
-  if (!conn || conn.source === 'demo') return null
+  if (!conn || conn.source !== 'square' || !conn.sealed) return null
   let tokens: Tokens
   try {
     tokens = unseal(conn.sealed)

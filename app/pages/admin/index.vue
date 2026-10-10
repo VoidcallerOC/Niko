@@ -9,6 +9,7 @@ interface Dashboard {
   integrations: { square: { configured: boolean; demo: boolean; businessName: string; lastApplyAt: string | null; lastError: string | null }; instagram: { source: string; importedAt: string; liveSync: boolean } }
 }
 const { data, error } = await useAsyncData('admin-dashboard', () => useRequestFetch()<Dashboard>('/api/admin/dashboard'))
+const { data: who } = await useAdminSession()
 
 const tiles = computed(() => {
   const c = data.value?.counts
@@ -70,7 +71,16 @@ const tiles = computed(() => {
     </div>
 
     <AdminPanel class="mt-5" title="Connections">
-      <dl class="grid gap-3 sm:grid-cols-2">
+      <dl class="grid gap-3 sm:grid-cols-3">
+        <div class="rounded-md bg-nc-char p-3" data-storage>
+          <dt class="text-sm font-semibold">Storage</dt>
+          <dd class="mt-1 text-sm text-nc-mist">
+            {{ who?.storage?.label }}.
+            <template v-if="who?.storage?.backend === 'redis'"> Inventory, photos and your account survive restarts and redeploys.</template>
+            <template v-else-if="who?.storage?.backend === 'fs'"> Fine for trying it on a computer; Vercel needs Redis.</template>
+            <template v-else-if="who?.storage?.backend === 'demo'"> Nothing here is saved.</template>
+          </dd>
+        </div>
         <div class="rounded-md bg-nc-char p-3">
           <dt class="text-sm font-semibold">Square</dt>
           <dd class="mt-1 text-sm text-nc-mist">

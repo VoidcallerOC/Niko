@@ -10,20 +10,15 @@ const { data, refresh } = await useAsyncData('admin-settings', () => useRequestF
 const form = reactive<Settings>(JSON.parse(JSON.stringify(data.value?.settings)))
 const saving = ref(false)
 
-interface SessionInfo {
-  demo: boolean
-  methods: { square: boolean }
-  owner: { bound: boolean; email?: string; businessName?: string; source?: string; hasPassword?: boolean; squareLinked?: boolean }
-}
-const { data: who, refresh: refreshWho } = await useAsyncData('admin-session', () => useRequestFetch()<SessionInfo>('/api/admin/auth/session'))
-const pw = reactive({ email: '', current: '', password: '', confirm: '' })
+const { data: who, refresh: refreshWho } = await useAdminSession()
+const pw = reactive({ current: '', password: '', confirm: '' })
 const pwBusy = ref(false)
 async function savePassword() {
   pwBusy.value = true
   try {
-    const res = await call<{ ok: true; email: string }>('/api/admin/auth/password', { body: { ...pw } })
+    const res = await call<{ ok: true }>('/api/admin/auth/password', { body: { ...pw } })
     if (res) {
-      toast.saved(who.value?.owner.hasPassword ? 'Password changed' : 'Password set')
+      toast.saved('Password changed. Other devices are signed out.')
       pw.current = pw.password = pw.confirm = ''
       await refreshWho()
     }
@@ -98,19 +93,17 @@ async function save() {
         </AdminPanel>
 
         <AdminPanel title="Owner sign-in" intro="Who can open this admin.">
-          <dl v-if="who?.owner.bound" class="grid gap-2 text-sm sm:grid-cols-2">
-            <div><dt class="text-white/60">Email</dt><dd class="font-semibold">{{ who.owner.email || 'not set' }}</dd></div>
-            <div><dt class="text-white/60">Square</dt><dd class="font-semibold">{{ who.owner.squareLinked ? (who.owner.businessName || 'linked') : 'not linked' }}<span v-if="who.owner.source === 'demo'" class="ml-2 rounded-sm bg-nc-red px-1.5 py-0.5 text-[0.6875rem] font-bold text-white uppercase">Sample</span></dd></div>
+          <dl v-if="who?.owner" class="grid gap-2 text-sm sm:grid-cols-2">
+            <div><dt class="text-white/60">Sign-in email</dt><dd class="font-semibold break-all">{{ who.owner.email }}</dd></div>
+            <div><dt class="text-white/60">Square</dt><dd class="font-semibold">{{ who.owner.squareLinked ? (who.owner.businessName || 'connected') : 'not connected' }} · <NuxtLink to="/admin/square" class="underline">manage</NuxtLink></dd></div>
           </dl>
-          <p v-else class="text-sm text-nc-mist">{{ who?.demo ? 'Demo mode: no owner account.' : 'No owner account yet.' }}</p>
-          <a v-if="who?.owner.bound && !who.owner.squareLinked && who.methods.square" href="/api/admin/auth/square/start?next=%2Fadmin%2Fsettings" class="mt-3 inline-flex min-h-12 items-center justify-center rounded-md bg-white px-4 text-[0.9375rem] font-semibold text-nc-ink hover:bg-white/85">Link my Square account</a>
-          <form v-if="who?.owner.bound && !who.demo" class="mt-4 grid gap-3 border-t border-nc-rule pt-4" @submit.prevent="savePassword">
-            <p class="text-sm font-semibold">{{ who.owner.hasPassword ? 'Change password' : 'Set a password (so you can sign in without Square)' }}</p>
-            <AdminField v-if="!who.owner.email" v-model="pw.email" label="Sign-in email" type="email" inputmode="email" autocomplete="username" />
-            <AdminField v-if="who.owner.hasPassword" v-model="pw.current" label="Current password" type="password" autocomplete="current-password" />
-            <AdminField v-model="pw.password" label="New password" type="password" autocomplete="new-password" hint="At least 12 characters." />
+          <p v-else class="text-sm text-nc-mist">Demo mode has no owner account.</p>
+          <form v-if="who?.owner && !who.demo" class="mt-4 grid gap-3 border-t border-nc-rule pt-4" @submit.prevent="savePassword">
+            <p class="text-sm font-semibold">Change password</p>
+            <AdminField v-model="pw.current" label="Current password" type="password" autocomplete="current-password" />
+            <AdminField v-model="pw.password" label="New password" type="password" autocomplete="new-password" hint="At least 12 characters. Changing it signs out every other device." />
             <AdminField v-model="pw.confirm" label="Repeat new password" type="password" autocomplete="new-password" />
-            <div><AdminButton type="submit" variant="white" :busy="pwBusy" :disabled="!pw.password || !pw.confirm">{{ who.owner.hasPassword ? 'Change password' : 'Set password' }}</AdminButton></div>
+            <div><AdminButton type="submit" variant="white" :busy="pwBusy" :disabled="!pw.current || !pw.password || !pw.confirm">Change password</AdminButton></div>
           </form>
         </AdminPanel>
 

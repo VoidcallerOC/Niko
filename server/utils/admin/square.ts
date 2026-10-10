@@ -3,12 +3,14 @@ import type { Product, SquareField } from './types'
 import { SQUARE_SYNC_FIELDS, emptyProduct } from './types'
 import { getProduct, listProducts, logActivity, newId, nowIso, putProduct, saveRevision, putSquareState, getSquareState } from './store'
 import { isDemo } from './auth'
-import { connectedAccessToken, getConnection, squareAuthConfig } from './squareAuth'
+import { connectedAccessToken, getConnection, squareAuthConfig, squareSetupProblems } from './squareAuth'
 
 /**
  * Square, official Catalog + Inventory APIs only
- * (https://developer.squareup.com/reference/square). The access token lives
- * in NUXT_SQUARE_ACCESS_TOKEN on the server and never reaches the browser.
+ * (https://developer.squareup.com/reference/square). Access comes only from
+ * the OAuth connection Nino makes from the admin (tokens sealed server-side,
+ * refreshed automatically); nothing reaches the browser. Demo mode never
+ * contacts Square and uses a labelled SAMPLE catalog instead.
  *
  * Harris in Wonderland's catalog loader reads Square Online's undocumented
  * storefront editor endpoint; that path is deliberately NOT reused here. Only
@@ -62,25 +64,17 @@ export interface ApplyPlan {
   confirm: boolean
 }
 
-/**
- * Access comes from the OAuth connection made by "Sign in with Square"
- * (preferred, refreshed automatically) or, as a fallback for a self-hosted
- * setup, a personal access token in NUXT_SQUARE_ACCESS_TOKEN.
- */
 async function config() {
-  const cfg = useRuntimeConfig()
   const { env, api: origin } = squareAuthConfig()
-  const oauth = await connectedAccessToken().catch(() => null)
-  const token = oauth?.token || String(cfg.square?.accessToken || process.env.SQUARE_ACCESS_TOKEN || '')
-  const locationId = oauth?.locationId || String(cfg.square?.locationId || process.env.SQUARE_LOCATION_ID || '')
-  return { token, env, locationId, origin, via: oauth ? ('oauth' as const) : token ? ('env' as const) : null }
+  const oauth = isDemo() ? null : await connectedAccessToken().catch(() => null)
+  return { token: oauth?.token ?? '', env, locationId: oauth?.locationId ?? '', origin }
 }
 
 export const squareConfigured = async () => isDemo() || !!(await config()).token
 
 async function squareFetch<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const { token, origin } = await config()
-  if (!token) throw createError({ statusCode: 503, statusMessage: 'Square is not connected. Sign in with Square on the login page, or add NUXT_SQUARE_ACCESS_TOKEN on the server.' })
+  if (!token) throw createError({ statusCode: 503, statusMessage: 'Square is not connected. Use Connect Square on the Square page.' })
   const res = await fetch(`${origin}${path}`, {
     method: init?.method ?? 'GET',
     headers: {
@@ -106,7 +100,7 @@ const demoCatalog: SquareItem[] = [
 ]
 
 async function fetchCatalog(): Promise<{ items: SquareItem[]; source: 'square' | 'demo' }> {
-  if (isDemo() && !(await config()).token) {
+  if (isDemo()) {
     // Link the first sample card so the conflict flow has something to show.
     const linked = await getProduct('demo000000000001')
     if (linked && !linked.squareId) await putProduct({ ...linked, squareId: 'SAMPLE-SQ-ITEM-1', squareVariationId: 'SAMPLE-SQ-VAR-1' })
@@ -318,21 +312,19 @@ export async function applySync(plan: ApplyPlan) {
 }
 
 export async function squareStatus() {
-  const { token, env, locationId, via } = await config()
+  const demo = isDemo()
+  const { token, env, locationId } = await config()
   const conn = await getConnection().catch(() => null)
-  const { appId, appSecret } = squareAuthConfig()
-  const oauthReady = !!(appId && appSecret)
+  const problems = demo ? [] : squareSetupProblems()
   const connection = conn
     ? { businessName: conn.businessName, email: conn.email, merchantId: conn.merchantId, locationName: conn.locationName, locationId: conn.locationId, connectedAt: conn.connectedAt, expiresAt: conn.expiresAt, source: conn.source }
     : null
-  const note = token
-    ? via === 'oauth'
-      ? `Connected to Square ${env} as ${conn?.businessName || conn?.merchantId || 'the owner account'} through Sign in with Square.${locationId ? '' : ' No active location was found, so quantities are not synced.'}`
-      : `Connected to Square ${env} through NUXT_SQUARE_ACCESS_TOKEN${locationId ? '' : '. Add NUXT_SQUARE_LOCATION_ID to sync quantities.'}`
-    : isDemo()
-      ? 'Demo mode: a labelled SAMPLE Square catalog stands in for a real account. No real Square account is contacted.'
-      : oauthReady
-        ? 'Not connected. Use "Connect Square" below (or Sign in with Square on the login page) to link Nino’s Square account. The admin works fully without it.'
-        : 'Not connected. To enable, register a Square application and set NUXT_SQUARE_APP_ID and NUXT_SQUARE_APP_SECRET on the server; then Nino connects with his own Square login. The admin works fully without it.'
-  return { configured: !!token, demo: isDemo() && !token, env, hasLocation: !!locationId, via, oauthReady: oauthReady || isDemo(), connection, note }
+  const note = demo
+    ? 'Demo mode: a labelled SAMPLE Square catalog stands in for a real account. No real Square account is ever contacted in demo mode.'
+    : token
+      ? `Connected to Square ${env} as ${conn?.businessName || conn?.merchantId || 'the owner account'}.${locationId ? '' : ' No active location was found, so quantities are not synced.'}`
+      : problems.length
+        ? 'Square can’t be connected yet: the site is missing its Square app settings. Nick needs to set the values listed below; then Nino connects with his own Square login.'
+        : 'Not connected. Tap Connect Square to sign in on Square’s own page and approve access. The admin works fully without it.'
+  return { configured: demo || !!token, demo, env, hasLocation: !!locationId, canConnect: demo || problems.length === 0, problems, connection, note }
 }

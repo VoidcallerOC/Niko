@@ -6,7 +6,9 @@ import { newId, nowIso, putUpload } from '../../utils/admin/store'
  * go to the admin storage mount and are served from /media/:id.
  */
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp'])
-const MAX_BYTES = 10 * 1024 * 1024
+// The admin resizes photos in the browser first (~200–500 KB); this cap only
+// stops oversized files from filling the durable store.
+const MAX_BYTES = 4 * 1024 * 1024
 
 export default defineEventHandler(async (event) => {
   const parts = await readMultipartFormData(event)
@@ -14,7 +16,7 @@ export default defineEventHandler(async (event) => {
   if (!file) throw createError({ statusCode: 400, statusMessage: 'Choose a photo.' })
   const type = sniffType(file.data) ?? file.type ?? ''
   if (!ALLOWED.has(type)) throw createError({ statusCode: 415, statusMessage: 'Use a JPEG, PNG or WebP photo.' })
-  if (file.data.length > MAX_BYTES) throw createError({ statusCode: 413, statusMessage: 'Photos must be under 10 MB.' })
+  if (file.data.length > MAX_BYTES) throw createError({ statusCode: 413, statusMessage: 'Photos must be under 4 MB.' })
   const id = newId()
   await putUpload(id, { id, type, size: file.data.length, createdAt: nowIso() }, file.data)
   return { id, src: `/media/${id}`, type, size: file.data.length }

@@ -1,22 +1,22 @@
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
-
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import type { H3Event } from 'h3'
+import { getOwner, type OwnerAccount } from './owner'
+import { isDemoEnv, sessionSecretSync, storageStatus } from './runtime'
 
 /**
  * Owner sign-in.
  *
- * - One owner account, no usernames: the password is checked on the server
- *   against a scrypt hash in NUXT_ADMIN_PASSWORD_HASH (make one with
- *   `node scripts/admin-password.mjs`). The browser never sees the hash.
- * - The session is an h3 sealed cookie (iron-webcrypto): HTTP-only, SameSite
- *   Lax, Secure outside dev, 12-hour lifetime, encrypted with
- *   NUXT_SESSION_SECRET. Nothing about the session is readable client-side.
- * - Demo mode (NUXT_ADMIN_DEMO=1) uses the fixed password below and seeds
- *   clearly labelled sample data. It is for previewing the interface only.
+ * - One owner account, created by Nino on his first visit (see owner.ts and
+ *   /api/admin/auth/setup). Email + password checked on the server against an
+ *   scrypt hash; or Sign in with Square once he has linked his Square account.
+ * - The session is an h3 sealed cookie: HTTP-only, SameSite Lax, Secure
+ *   outside dev, 12-hour lifetime. It carries the owner id and a session
+ *   version, both re-checked against the stored owner on every request.
+ * - Demo mode (NUXT_ADMIN_DEMO=1) uses a fixed password and in-memory SAMPLE
+ *   data; it never touches the real store.
  *
  * Pattern reference: Infinite Heroes' `requireAdmin()` (server-side check that
- * redirects to the sign-in page); the Supabase role lookup is replaced with a
- * single owner credential because this site has one owner and no user table.
+ * redirects to the sign-in page), with a single owner instead of a user table.
  */
 
 export const DEMO_PASSWORD = 'demo-nino'
@@ -25,42 +25,35 @@ const SESSION_MAX_AGE = 60 * 60 * 12
 
 export interface AdminSessionData {
   owner?: true
+  ownerId?: string
+  sessionVersion?: number
   signedInAt?: string
   demo?: boolean
-  /** How the owner signed in. */
   via?: 'password' | 'square'
   email?: string
-  businessName?: string
-  /** Square OAuth CSRF state while a sign-in is in flight. */
+  /** Square OAuth round trip in flight. */
   oauthState?: string
   oauthNext?: string
+  oauthIntent?: 'connect' | 'signin'
 }
 
 export interface AuthConfig {
-  /**
-   * 'demo'     → fixed demo password, sample data.
-   * 'password' → an env hash (NUXT_ADMIN_PASSWORD_HASH) is set.
-   * 'owner'    → no env hash: the owner account in the store decides (first-run setup, Square, or both).
-   * 'unconfigured' → no usable session secret (should not happen: the storage plugin generates one).
-   */
-  mode: 'password' | 'demo' | 'owner' | 'unconfigured'
+  /** demo → sample data; owner → the real owner account; unconfigured → see reason. */
+  mode: 'demo' | 'owner' | 'unconfigured'
   secret: string | null
   reason?: string
 }
 
-export function authConfig(): AuthConfig {
-  const cfg = useRuntimeConfig()
-  const demo = String(cfg.adminDemo ?? '') === '1' || String(cfg.adminDemo ?? '') === 'true'
-  const hash = String(cfg.adminPasswordHash ?? '')
-  let secret = String(cfg.sessionSecret ?? '')
-  if (secret.length < 32) secret = (globalThis as { __ncSessionSecret?: string }).__ncSessionSecret ?? ''
-  if (secret.length < 32) return { mode: 'unconfigured', secret: null, reason: 'No session secret is available yet. Set NUXT_SESSION_SECRET or check the admin storage mount.' }
-  if (demo) return { mode: 'demo', secret }
-  if (hash.startsWith('scrypt$')) return { mode: 'password', secret }
-  return { mode: 'owner', secret }
-}
+export const isDemo = () => isDemoEnv()
 
-export const isDemo = () => authConfig().mode === 'demo'
+/** Call after ensureSessionSecret() (the admin-guard middleware does this). */
+export function authConfig(): AuthConfig {
+  const storage = storageStatus()
+  if (storage.problem) return { mode: 'unconfigured', secret: null, reason: storage.problem }
+  const secret = sessionSecretSync()
+  if (secret.length < 32) return { mode: 'unconfigured', secret: null, reason: 'The session secret is not ready. Reload the page.' }
+  return { mode: isDemoEnv() ? 'demo' : 'owner', secret }
+}
 
 export function hashPassword(password: string) {
   const salt = randomBytes(16)
@@ -82,22 +75,27 @@ export function sessionFor(event: H3Event, secret: string) {
     name: SESSION_NAME,
     password: secret,
     maxAge: SESSION_MAX_AGE,
-    cookie: {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: !import.meta.dev,
-      path: '/',
-    },
+    cookie: { httpOnly: true, sameSite: 'lax', secure: !import.meta.dev, path: '/' },
   })
 }
 
-/** The owner's session, or null. Never throws for a missing/invalid cookie. */
+/**
+ * The owner's session, or null. Never throws for a missing or invalid cookie.
+ * Outside demo mode the cookie must name the current owner account and its
+ * current session version, so a reset account or a changed password ends
+ * every older session.
+ */
 export async function getOwnerSession(event: H3Event) {
   const cfg = authConfig()
   if (!cfg.secret) return null
   try {
     const session = await sessionFor(event, cfg.secret)
-    return session.data.owner ? session : null
+    if (!session.data.owner) return null
+    if (cfg.mode === 'demo') return session.data.demo ? session : null
+    if (session.data.demo) return null
+    const owner = await getOwner()
+    if (!owner || owner.id !== session.data.ownerId || owner.sessionVersion !== session.data.sessionVersion) return null
+    return session
   } catch {
     return null
   }
@@ -109,79 +107,91 @@ export async function requireOwner(event: H3Event) {
   return session
 }
 
-// Sign-in attempts: 5 failures per IP per 15 minutes, in memory.
-const attempts = new Map<string, { count: number; resetAt: number }>()
-const WINDOW_MS = 15 * 60 * 1000
+// --- Attempt limits (kept in the admin store so every instance shares them) --
+const WINDOW_SECONDS = 15 * 60
 const MAX_FAILURES = 5
 
-function clientKey(event: H3Event) {
-  return getRequestIP(event, { xForwardedFor: true }) || 'unknown'
+function clientKey(event: H3Event, scope: string) {
+  const ip = getRequestIP(event, { xForwardedFor: true }) || 'unknown'
+  return `ratelimit:${scope}:${createHash('sha256').update(ip).digest('hex').slice(0, 24)}`
 }
 
-export function loginAllowed(event: H3Event) {
-  const entry = attempts.get(clientKey(event))
-  if (!entry) return true
-  if (Date.now() > entry.resetAt) {
-    attempts.delete(clientKey(event))
-    return true
-  }
-  return entry.count < MAX_FAILURES
+interface Counter {
+  count: number
+  resetAt: number
 }
 
-export function recordFailure(event: H3Event) {
-  const key = clientKey(event)
-  const entry = attempts.get(key)
-  if (!entry || Date.now() > entry.resetAt) attempts.set(key, { count: 1, resetAt: Date.now() + WINDOW_MS })
-  else entry.count += 1
+async function readCounter(key: string): Promise<Counter | null> {
+  const c = await useStorage('admin').getItem<Counter>(key)
+  if (!c || Date.now() > c.resetAt) return null
+  return c
 }
 
-export function clearFailures(event: H3Event) {
-  attempts.delete(clientKey(event))
+async function bump(key: string, windowSeconds: number) {
+  const c = await readCounter(key)
+  const next: Counter = c ? { count: c.count + 1, resetAt: c.resetAt } : { count: 1, resetAt: Date.now() + windowSeconds * 1000 }
+  await useStorage('admin').setItem(key, next, { ttl: windowSeconds })
 }
 
-/**
- * Password sign-in. Order of truth: demo password in demo mode; otherwise the
- * owner account's own hash (set by Nino at first run or in Settings); otherwise
- * the env hash. With an owner account, the email must match too.
- */
-export async function signIn(event: H3Event, email: string, password: string, owner: { email: string; passwordHash?: string } | null) {
-  const cfg = authConfig()
-  if (cfg.mode === 'unconfigured' || !cfg.secret) {
-    throw createError({ statusCode: 503, statusMessage: cfg.reason ?? 'Sign-in is not configured.' })
-  }
-  if (!loginAllowed(event)) {
-    throw createError({ statusCode: 429, statusMessage: 'Too many attempts. Wait 15 minutes and try again.' })
-  }
-  let ok = false
-  if (cfg.mode === 'demo') ok = password === DEMO_PASSWORD
-  else if (owner?.passwordHash) ok = owner.email.toLowerCase() === email.trim().toLowerCase() && verifyPassword(password, owner.passwordHash)
-  else if (cfg.mode === 'password') ok = verifyPassword(password, String(useRuntimeConfig().adminPasswordHash))
-  if (!ok) {
-    recordFailure(event)
-    throw createError({ statusCode: 401, statusMessage: owner?.passwordHash ? 'Wrong email or password.' : 'Wrong password.' })
-  }
-  clearFailures(event)
-  const session = await sessionFor(event, cfg.secret)
-  await session.clear()
-  await session.update({ owner: true, via: 'password', email: owner?.email || '', signedInAt: new Date().toISOString(), demo: cfg.mode === 'demo' })
-  return session
+export async function assertAttemptsAllowed(event: H3Event, scope = 'login') {
+  const c = await readCounter(clientKey(event, scope))
+  if (c && c.count >= MAX_FAILURES) throw createError({ statusCode: 429, statusMessage: 'Too many attempts. Wait 15 minutes and try again.' })
 }
+export const recordFailure = (event: H3Event, scope = 'login') => bump(clientKey(event, scope), WINDOW_SECONDS)
+export const clearFailures = (event: H3Event, scope = 'login') => useStorage('admin').removeItem(clientKey(event, scope))
 
-/** Session cookie for a visitor who is not signed in yet (used to hold the OAuth state). */
-export async function anonymousSession(event: H3Event) {
-  const cfg = authConfig()
-  if (!cfg.secret) throw createError({ statusCode: 503, statusMessage: cfg.reason ?? 'Sign-in is not configured.' })
-  return sessionFor(event, cfg.secret)
+/** Site-wide cap on wrong setup codes, so rotating IP addresses does not help. */
+const SETUP_GLOBAL_KEY = 'ratelimit:setup:global'
+const SETUP_GLOBAL_MAX = 20
+const SETUP_GLOBAL_WINDOW = 60 * 60
+export async function assertSetupNotLocked() {
+  const c = await readCounter(SETUP_GLOBAL_KEY)
+  if (c && c.count >= SETUP_GLOBAL_MAX) throw createError({ statusCode: 429, statusMessage: 'Setup is locked for an hour after too many wrong codes.' })
 }
+export const recordSetupFailure = () => bump(SETUP_GLOBAL_KEY, SETUP_GLOBAL_WINDOW)
 
-/** Sign the owner in after a verified Square identity (binding already checked by the caller). */
-export async function signInOwner(event: H3Event, data: Pick<AdminSessionData, 'via' | 'email' | 'businessName' | 'demo'>) {
+// --- Signing in ---------------------------------------------------------------
+async function startSession(event: H3Event, data: AdminSessionData) {
   const cfg = authConfig()
   if (!cfg.secret) throw createError({ statusCode: 503, statusMessage: cfg.reason ?? 'Sign-in is not configured.' })
   const session = await sessionFor(event, cfg.secret)
   await session.clear()
   await session.update({ owner: true, signedInAt: new Date().toISOString(), ...data })
   return session
+}
+
+export const signInAsOwner = (event: H3Event, owner: OwnerAccount, via: 'password' | 'square') =>
+  startSession(event, { ownerId: owner.id, sessionVersion: owner.sessionVersion, email: owner.email, via, demo: false })
+
+/** Email + password. Demo mode takes the demo password instead. */
+export async function signInWithPassword(event: H3Event, email: string, password: string) {
+  const cfg = authConfig()
+  if (cfg.mode === 'unconfigured') throw createError({ statusCode: 503, statusMessage: cfg.reason ?? 'Sign-in is not configured.' })
+  await assertAttemptsAllowed(event)
+  if (cfg.mode === 'demo') {
+    if (password !== DEMO_PASSWORD) {
+      await recordFailure(event)
+      throw createError({ statusCode: 401, statusMessage: 'Wrong password.' })
+    }
+    await clearFailures(event)
+    return startSession(event, { demo: true, via: 'password', email: 'demo' })
+  }
+  const owner = await getOwner()
+  if (!owner) throw createError({ statusCode: 409, statusMessage: 'The owner account has not been created yet.' })
+  const ok = owner.email.toLowerCase() === email.trim().toLowerCase() && verifyPassword(password, owner.passwordHash)
+  if (!ok) {
+    await recordFailure(event)
+    throw createError({ statusCode: 401, statusMessage: 'Wrong email or password.' })
+  }
+  await clearFailures(event)
+  return signInAsOwner(event, owner, 'password')
+}
+
+/** Cookie for a visitor who is not signed in yet (holds the OAuth state). */
+export async function anonymousSession(event: H3Event) {
+  const cfg = authConfig()
+  if (!cfg.secret) throw createError({ statusCode: 503, statusMessage: cfg.reason ?? 'Sign-in is not configured.' })
+  return sessionFor(event, cfg.secret)
 }
 
 export async function signOut(event: H3Event) {

@@ -8,8 +8,8 @@ interface Status {
   demo: boolean
   env: string
   hasLocation: boolean
-  via: 'oauth' | 'env' | null
-  oauthReady: boolean
+  canConnect: boolean
+  problems: string[]
   connection: { businessName: string; email: string; merchantId: string; locationName: string; locationId: string; connectedAt: string; expiresAt: string; source: 'square' | 'demo' } | null
   note: string
   state: { lastPreviewAt: string | null; lastApplyAt: string | null; lastError: string | null }
@@ -19,6 +19,21 @@ const toast = useAdminToast()
 const { data: status, refresh: refreshStatus } = await useAsyncData('admin-square', () => useRequestFetch()<Status>('/api/admin/square/status'))
 
 const preview = ref<SyncPreview | null>(null)
+const route = useRoute()
+const squareErrors: Record<string, string> = {
+  denied: 'You cancelled on Square’s page. Nothing was connected.',
+  state: 'That connect link expired. Tap Connect Square again.',
+  square: 'Square did not finish connecting. Try again in a moment.',
+  othermerchant: 'That is a different Square account from the one already linked. Disconnect first, then connect the other account.',
+  notconfigured: 'Square can’t be connected until the site’s Square app settings are in place.',
+  signedout: 'Your session ended during the Square step. Sign in and try again.',
+}
+onMounted(() => {
+  const err = typeof route.query.error === 'string' ? route.query.error : ''
+  if (err) toast.error(squareErrors[err] ?? 'Square did not connect.')
+  else if (route.query.connected) toast.saved('Square connected')
+  if (err || route.query.connected) navigateTo({ query: {} }, { replace: true })
+})
 const confirmDisconnect = ref(false)
 async function disconnect() {
   const res = await call('/api/admin/square/disconnect')
@@ -100,8 +115,13 @@ async function apply() {
         <div><dt class="text-white/60">Connected</dt><dd class="font-semibold">{{ timeAgo(status.connection.connectedAt) }}<span v-if="status.connection.expiresAt" class="text-white/60"> · token renews automatically</span></dd></div>
       </dl>
       <div class="mt-4 flex flex-wrap gap-2">
-        <a v-if="!status?.connection && status?.oauthReady" href="/api/admin/auth/square/start?next=%2Fadmin%2Fsquare" class="inline-flex min-h-12 items-center justify-center rounded-md bg-white px-4 text-[0.9375rem] font-semibold text-nc-ink hover:bg-white/85">Connect Square</a>
+        <a v-if="!status?.connection && status?.canConnect" href="/api/admin/auth/square/start?next=%2Fadmin%2Fsquare" class="inline-flex min-h-12 items-center justify-center rounded-md bg-white px-4 text-[0.9375rem] font-semibold text-nc-ink hover:bg-white/85" data-square-connect>{{ status.demo ? 'Connect SAMPLE Square account' : 'Connect Square' }}</a>
         <AdminButton v-if="status?.connection" variant="danger" @click="confirmDisconnect = true">Disconnect</AdminButton>
+      </div>
+      <p v-if="!status?.connection && status?.canConnect && !status.demo" class="mt-2 text-xs text-white/55">You’ll sign in on Square’s own page and approve access. This site never sees your Square password, and the access it gets is stored encrypted on the server.</p>
+      <div v-if="status?.problems.length" class="mt-3 rounded-md border border-white/15 bg-nc-char p-3 text-sm" data-square-missing>
+        <p class="font-semibold">Missing site settings (Nick sets these in Vercel):</p>
+        <ul class="mt-1 list-disc pl-5 text-white/80"><li v-for="p in status.problems" :key="p"><code class="font-mono text-xs">{{ p }}</code></li></ul>
       </div>
       <dl class="mt-3 grid gap-2 text-xs text-white/60 sm:grid-cols-3">
         <div><dt>Last preview</dt><dd class="text-white">{{ status?.state.lastPreviewAt ? timeAgo(status.state.lastPreviewAt) : 'never' }}</dd></div>
@@ -165,7 +185,7 @@ async function apply() {
     </template>
 
     <AdminConfirm :open="confirmDisconnect" title="Disconnect Square?" confirm-label="Disconnect" danger @confirm="disconnect" @cancel="confirmDisconnect = false">
-      <p>The stored Square tokens are revoked. Cards keep their Square links, so reconnecting later picks up where it left off. The owner sign-in binding is kept.</p>
+      <p>This site’s access to Square is revoked and the stored tokens are deleted. Sign in with Square stops working until you connect again; your email and password still work. Cards keep their Square links.</p>
     </AdminConfirm>
     <AdminConfirm :open="confirmOpen" title="Apply this sync?" confirm-label="Apply" :busy="busy" @confirm="apply" @cancel="confirmOpen = false">
       <ul class="list-disc pl-5">

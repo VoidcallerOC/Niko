@@ -2,49 +2,55 @@
 import { site } from '~/data/site'
 
 const reasons = [
-  { title: 'Want a card?', body: 'DM about a card or a deal you saw in a post.' },
-  { title: 'Selling cards?', body: 'Send photos of what you have.' },
-  { title: 'Next show or live?', body: 'Check the latest posts and stories.' },
+  { n: '01', title: 'Buying', body: 'Saw a card in a post? DM Nino and ask if it’s still around.', to: 'instagram' },
+  { n: '02', title: 'Selling', body: 'Got cards to move? Send Nino photos of what you have.', to: 'instagram' },
+  { n: '03', title: 'Shows', body: 'Want to meet at a show? Check his OnTreasure profile for where he’s vending.', to: 'ontreasure' },
 ] as const
 </script>
 
 <template>
-  <section id="contact" aria-labelledby="contact-title" class="bg-nc-red text-white">
-    <div class="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-24">
-      <div class="grid gap-10 md:grid-cols-[1.2fr_1fr] md:items-center">
-        <div>
-          <p class="text-xs font-bold tracking-[0.2em] text-white/80 uppercase">Contact</p>
-          <h2 id="contact-title" class="mt-3 font-display text-4xl leading-[0.95] uppercase sm:text-6xl">
-            Slide into<br>the DMs.
-          </h2>
-          <p class="mt-5 max-w-lg text-lg text-white/90">
-            Instagram is where to reach Nino — for cards, deals, selling your collection, and
-            what’s coming up next.
-          </p>
-          <div class="mt-8 flex flex-col items-start gap-3">
-            <InstagramButton variant="dark" size="lg">Message {{ site.handle }}</InstagramButton>
-            <a
-              :href="site.instagramUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-sm font-medium break-all text-white/90 underline underline-offset-4 hover:text-white"
-            >
-              instagram.com/ninoscollectibles<span class="sr-only"> (opens in a new tab)</span>
-            </a>
-          </div>
-        </div>
+  <section id="contact" aria-labelledby="contact-title" class="border-t-8 border-nc-red bg-white">
+    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-24">
+      <p class="meta text-nc-red">05 — Contact</p>
+      <h2 id="contact-title" class="mt-3 font-display text-5xl leading-[0.9] uppercase sm:text-7xl">
+        Hit the DMs.
+      </h2>
+      <p class="mt-4 max-w-xl text-lg text-nc-muted">
+        Instagram is the way to reach Nino about cards, deals and shows.
+      </p>
 
-        <ul class="grid gap-3" role="list">
-          <li
-            v-for="reason in reasons"
-            :key="reason.title"
-            class="rounded-2xl border border-white/25 bg-white/10 p-5"
+      <a
+        :href="site.instagramUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="group mt-8 inline-flex min-h-11 max-w-full items-center gap-3 font-display text-[clamp(2rem,9vw,5.5rem)] leading-none break-all uppercase hover:text-nc-red sm:break-normal"
+      >
+        <IconInstagram class="h-[0.7em] w-[0.7em] shrink-0 text-nc-red" />
+        <span>{{ site.handle }}</span>
+        <span class="sr-only">(opens on Instagram in a new tab)</span>
+      </a>
+
+      <ol role="list" class="mt-12 border-t border-nc-ink">
+        <li v-for="r in reasons" :key="r.n" class="border-b border-nc-line">
+          <a
+            :href="r.to === 'instagram' ? site.instagramUrl : site.onTreasureUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="group grid grid-cols-[2.5rem_1fr_auto] items-center gap-x-4 gap-y-1 py-5 sm:grid-cols-[4rem_10rem_1fr_auto]"
           >
-            <p class="font-display text-lg uppercase">{{ reason.title }}</p>
-            <p class="mt-1 text-white/90">{{ reason.body }}</p>
-          </li>
-        </ul>
-      </div>
+            <span class="meta text-nc-red">{{ r.n }}</span>
+            <span class="font-display text-2xl uppercase">{{ r.title }}</span>
+            <span class="col-start-2 text-nc-muted sm:col-start-auto">{{ r.body }}</span>
+            <span
+              aria-hidden="true"
+              class="col-start-3 row-span-2 row-start-1 text-2xl transition-transform group-hover:translate-x-1 sm:col-start-auto sm:row-span-1 sm:row-start-auto"
+            >→</span>
+            <span class="sr-only">
+              ({{ r.to === 'instagram' ? `opens ${site.handle} on Instagram` : 'opens Nino’s OnTreasure profile' }} in a new tab)
+            </span>
+          </a>
+        </li>
+      </ol>
     </div>
   </section>
 </template>

@@ -1,56 +1,48 @@
 <script setup lang="ts">
-import { media } from '~/data/media'
+import { photos } from '~/data/media'
+import { site } from '~/data/site'
+
+const table = photos.tableDeals
 </script>
 
 <template>
-  <section id="shows" aria-labelledby="shows-title">
-    <div class="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-24">
-      <div class="max-w-2xl">
-        <p class="eyebrow">Shows &amp; livestreams</p>
-        <h2 id="shows-title" class="mt-3 font-display text-3xl leading-tight text-nc-black uppercase sm:text-5xl">
-          Catch Nino at the table — or on a live.
+  <section id="shows" aria-labelledby="shows-title" class="bg-nc-bone">
+    <div class="mx-auto grid max-w-7xl lg:grid-cols-12">
+      <figure class="relative lg:col-span-7">
+        <IgImage
+          :photo="table"
+          sizes="(min-width: 1024px) 58vw, 100vw"
+          class="aspect-[4/3] w-full object-cover object-[50%_70%] lg:aspect-auto lg:h-full"
+        />
+        <figcaption class="meta absolute bottom-3 left-3 bg-nc-bone px-2.5 py-1.5 text-nc-ink">
+          “{{ table.caption }}” · {{ formatPostDate(table.postDate) }}
+        </figcaption>
+      </figure>
+
+      <div class="flex flex-col justify-center px-4 py-12 sm:px-6 lg:col-span-5 lg:px-12 lg:py-24">
+        <p class="meta text-nc-red">02 — Vending events</p>
+        <h2 id="shows-title" class="mt-3 font-display text-5xl leading-[0.9] uppercase sm:text-6xl">
+          Find Nino <br>at a show.
         </h2>
-        <p class="mt-4 text-lg text-nc-ink/85">
-          Dates change, so they aren’t listed here. Upcoming vendor events and Whatnot shows get
-          announced on Instagram — check the latest posts and stories before you head out or tune in.
+        <p class="mt-5 text-lg leading-relaxed text-nc-muted">
+          Nino sets up at card shows. Look for the black <span class="font-semibold text-nc-ink">Nino’s
+          Collectibles</span> banner on the table. The shows he’s vending are listed on his
+          OnTreasure profile.
         </p>
-      </div>
 
-      <div class="mt-12 grid gap-6 md:grid-cols-2">
-        <article class="flex flex-col overflow-hidden rounded-3xl border border-nc-line bg-white shadow-sm">
-          <div class="p-3 pb-0">
-            <MediaSlot :item="media.vendorEvent" aspect="aspect-[16/10]" />
-          </div>
-          <div class="flex flex-1 flex-col p-6 sm:p-8">
-            <span class="inline-flex w-fit items-center gap-2 rounded-full bg-nc-red/10 px-3 py-1 text-xs font-bold tracking-wider text-nc-red-dark uppercase">
-              In person
-            </span>
-            <h3 class="mt-4 font-display text-2xl text-nc-black uppercase">Card shows &amp; vendor events</h3>
-            <p class="mt-2 flex-1 text-nc-ink/80">
-              Nino sets up a vendor table at card events. Come dig through cards, talk the hobby and
-              make a deal in person. Where and when is posted on Instagram.
-            </p>
-            <InstagramButton variant="dark" class="mt-6 self-start">Find the next event</InstagramButton>
-          </div>
-        </article>
+        <LinkButton to="ontreasure" size="lg" class="mt-8 self-stretch sm:self-start">
+          Find Nino at a show
+        </LinkButton>
+        <p class="meta mt-4 text-nc-muted">
+          Opens ontreasure.com/u/ninoscollectibles · check there for dates
+        </p>
 
-        <article class="flex flex-col overflow-hidden rounded-3xl bg-nc-black text-white">
-          <div class="p-3 pb-0">
-            <MediaSlot :item="media.livestream" aspect="aspect-[16/10]" dark />
-          </div>
-          <div class="flex flex-1 flex-col p-6 sm:p-8">
-            <span class="inline-flex w-fit items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-bold tracking-wider text-white uppercase">
-              <span aria-hidden="true" class="h-2 w-2 rounded-full bg-nc-red" />
-              Live on Whatnot
-            </span>
-            <h3 class="mt-4 font-display text-2xl uppercase">Whatnot shows</h3>
-            <p class="mt-2 flex-1 text-white/80">
-              Nino goes live on Whatnot — past streams have included a lunch show. When the next
-              one’s on, the time and the stream link are shared on Instagram.
-            </p>
-            <InstagramButton class="mt-6 self-start">Get the next show link</InstagramButton>
-          </div>
-        </article>
+        <blockquote class="mt-10 border-l-4 border-nc-red pl-4">
+          <p class="text-base leading-snug">“{{ photos.vendorSolo.caption }}”</p>
+          <footer class="meta mt-2 text-nc-muted">
+            {{ site.handle }} · {{ formatPostDate(photos.vendorSolo.postDate) }}
+          </footer>
+        </blockquote>
       </div>
     </div>
   </section>

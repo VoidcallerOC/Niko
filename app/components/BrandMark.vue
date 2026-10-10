@@ -1,33 +1,26 @@
 <script setup lang="ts">
-import { media } from '~/data/media'
+import { logo } from '~/data/media'
 
-withDefaults(defineProps<{ inverted?: boolean }>(), { inverted: false })
+withDefaults(defineProps<{ size?: 'sm' | 'lg' }>(), { size: 'sm' })
 </script>
 
 <template>
-  <span class="inline-flex items-center gap-2.5">
-    <img
-      v-if="media.logo.src"
-      :src="media.logo.src"
-      :alt="media.logo.alt"
-      class="h-10 w-10 rounded-full object-cover"
-    >
-    <!-- Typographic stand-in for the NC logo until the real file is added. -->
-    <span
-      v-else
-      aria-hidden="true"
-      class="grid h-10 w-10 place-items-center rounded-full bg-nc-red font-display text-sm tracking-tight text-white ring-2 ring-nc-black"
-      title="Stand-in mark — replace with the real NC logo"
-    >
-      NC
-    </span>
-    <span
-      :class="[
-        'font-display text-lg leading-none tracking-tight',
-        inverted ? 'text-white' : 'text-nc-black',
-      ]"
-    >
-      Nino’s<span class="text-nc-red"> Collectibles</span>
+  <span class="inline-flex items-center gap-3">
+    <picture>
+      <source :srcset="logo.src" type="image/webp">
+      <img
+        :src="logo.fallback"
+        :alt="logo.alt"
+        width="150"
+        height="150"
+        :class="[
+          'shrink-0 rounded-full ring-1 ring-white/15',
+          size === 'lg' ? 'h-16 w-16' : 'h-10 w-10',
+        ]"
+      >
+    </picture>
+    <span class="font-display text-lg leading-none tracking-wide text-white uppercase">
+      Nino’s <span class="text-nc-red">Collectibles</span>
     </span>
   </span>
 </template>

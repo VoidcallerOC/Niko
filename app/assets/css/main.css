@@ -1,22 +1,28 @@
 @import 'tailwindcss';
 
-/* Palette pulled from the NC / Nino's logo: red, black, white — on a warm neutral. */
+/*
+ * Brand anchor: the NC logo — red and white brush strokes on black.
+ * The page itself stays on a warm neutral so the card photography carries the color.
+ */
 @theme {
-  --color-nc-red: #d7262b;
-  --color-nc-red-dark: #a8161b;
-  --color-nc-black: #121212;
-  --color-nc-ink: #2a2a2a;
-  --color-nc-paper: #f6f4f0;
-  --color-nc-line: #e3dfd8;
+  --color-nc-red: #d6232a;
+  --color-nc-red-dark: #a9161c;
+  --color-nc-ink: #0f0f0f;
+  --color-nc-coal: #1b1b1b;
+  --color-nc-paper: #f3efe8;
+  --color-nc-bone: #faf8f4;
+  --color-nc-line: #ddd6cb;
+  --color-nc-muted: #5f5a53;
 
-  --font-display: 'Archivo Black', 'Arial Black', Impact, system-ui, sans-serif;
+  --font-display: 'Anton', 'Impact', 'Arial Narrow Bold', sans-serif;
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
-    scroll-padding-top: 5rem;
+    scroll-padding-top: 4.5rem;
   }
 
   body {
@@ -41,6 +47,17 @@
   }
 }
 
-@utility eyebrow {
-  @apply text-xs font-bold tracking-[0.2em] text-nc-red uppercase;
+/* Small mono label used for post dates and section markers. */
+@utility meta {
+  @apply font-mono text-[0.7rem] font-medium tracking-[0.14em] uppercase;
+}
+
+/* Forward slant borrowed from the logo's brush strokes. */
+@utility slash {
+  @apply relative inline-block px-[0.12em] text-white;
+
+  &::before {
+    content: '';
+    @apply absolute inset-y-[0.08em] -inset-x-[0.02em] -z-10 -skew-x-12 bg-nc-red;
+  }
 }

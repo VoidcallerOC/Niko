@@ -5,20 +5,20 @@ const [feature, ...rest] = feed
 </script>
 
 <template>
-  <section id="feed" aria-labelledby="feed-title" class="bg-nc-paper">
+  <section id="feed" aria-labelledby="feed-title" class="bg-nc-coal">
     <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-24">
       <!-- Intro + feature image -->
       <div class="grid gap-8 lg:grid-cols-12 lg:items-end lg:gap-10">
         <div class="lg:col-span-5 lg:pb-12">
           <p class="eyebrow">From the feed</p>
           <h2 id="feed-title" class="mt-3 text-title">Recent pulls, deals and pack rips</h2>
-          <p class="mt-4 max-w-md text-nc-muted">
+          <p class="mt-4 max-w-md text-nc-mist">
             A handful of Nino’s Instagram posts, mostly One Piece and Pokémon. These are past posts,
             not a stock list, so ask Nino what’s available before you count on a card.
           </p>
           <div class="mt-6 flex flex-col gap-3 sm:flex-row">
-            <LinkButton to="instagram" variant="ink" block>Ask about a card</LinkButton>
-            <LinkButton to="instagram" variant="outline-ink" block>Selling? Send photos</LinkButton>
+            <LinkButton to="instagram" block>Ask about a card</LinkButton>
+            <LinkButton to="instagram" variant="outline-light" block>Selling? Send photos</LinkButton>
           </div>
         </div>
 

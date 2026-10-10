@@ -132,13 +132,13 @@ onBeforeUnmount(() => {
       :aria-hidden="state === 'embedded' ? undefined : 'true'"
     />
 
-    <figcaption class="mt-4 max-w-[21rem] text-caption text-nc-muted">
+    <figcaption class="mt-4 max-w-[21rem] text-caption text-nc-mist">
       “{{ reel.caption }}”<span class="block">From Nino’s Reel, {{ formatPostDate(reel.postDate) }}</span>
       <a
         :href="reel.postUrl"
         target="_blank"
         rel="noopener noreferrer"
-        class="mt-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-nc-red-dark hover:underline"
+        class="mt-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-nc-red-bright hover:underline"
       >
         Watch on Instagram
         <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 11 11 5M6 5h5v5" /></svg>

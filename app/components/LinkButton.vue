@@ -33,7 +33,7 @@ const srNote = computed(() =>
 const variants = {
   red: 'bg-nc-red text-white hover:bg-nc-red-dark',
   ink: 'bg-nc-ink text-white hover:bg-black',
-  white: 'bg-white text-nc-ink hover:bg-nc-paper',
+  white: 'bg-white text-nc-ink hover:bg-white/85',
   'outline-light': 'text-white ring-1 ring-inset ring-white/50 hover:bg-white hover:text-nc-ink',
   'outline-ink': 'text-nc-ink ring-1 ring-inset ring-nc-ink/70 hover:bg-nc-ink hover:text-white',
 } as const

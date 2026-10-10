@@ -6,8 +6,8 @@ import { navLinks, site } from '~/data/site'
   <footer class="bg-nc-ink text-white/70">
     <div class="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-12 sm:px-6 md:flex-row md:items-center md:justify-between">
       <div>
-        <BrandMark size="lg" />
-        <p class="mt-4 max-w-sm text-sm">Trading cards, bought and sold by Nino. Pokémon, One Piece and more.</p>
+        <BrandMark variant="full" />
+        <p class="mt-2 max-w-sm text-sm">Trading cards, bought and sold by Nino. Pokémon, One Piece and more.</p>
       </div>
       <nav aria-label="Footer">
         <ul class="flex flex-wrap gap-x-6 gap-y-3">

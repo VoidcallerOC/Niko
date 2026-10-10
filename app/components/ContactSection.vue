@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { logo } from '~/data/media'
 import { site } from '~/data/site'
 
 const reasons = [
@@ -11,13 +12,21 @@ const reasons = [
 <template>
   <section id="contact" aria-labelledby="contact-title" class="border-t-8 border-nc-red bg-white">
     <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-24">
-      <p class="meta text-nc-red">05 — Contact</p>
-      <h2 id="contact-title" class="mt-3 font-display text-5xl leading-[0.9] uppercase sm:text-7xl">
-        Hit the DMs.
-      </h2>
-      <p class="mt-4 max-w-xl text-lg text-nc-muted">
-        Instagram is the way to reach Nino about cards, deals and shows.
-      </p>
+      <div class="flex items-start justify-between gap-6">
+        <div>
+          <p class="meta text-nc-red">05 — Contact</p>
+          <h2 id="contact-title" class="mt-3 font-display text-5xl leading-[0.9] uppercase sm:text-7xl">
+            Hit the DMs.
+          </h2>
+          <p class="mt-4 max-w-xl text-lg text-nc-muted">
+            Instagram is the way to reach Nino about cards, deals and shows.
+          </p>
+        </div>
+        <picture class="hidden shrink-0 sm:block">
+          <source :srcset="logo.full.srcset" sizes="13rem" type="image/webp">
+          <img :src="logo.full.fallback" alt="" width="640" height="640" class="h-44 w-44 lg:h-52 lg:w-52">
+        </picture>
+      </div>
 
       <a
         :href="site.instagramUrl"

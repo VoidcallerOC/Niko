@@ -40,13 +40,13 @@ const reel = photos.reelHeat
           </figcaption>
         </figure>
         <picture>
-          <source :srcset="logo.src" type="image/webp">
+          <source :srcset="logo.emblem.srcset" sizes="9rem" type="image/webp">
           <img
-            :src="logo.fallback"
+            :src="logo.emblem.fallback"
             alt=""
-            width="150"
-            height="150"
-            class="absolute -top-6 -left-6 h-24 w-24 rounded-full ring-4 ring-nc-paper sm:h-28 sm:w-28"
+            width="256"
+            height="256"
+            class="absolute -top-10 -left-8 h-28 w-28 drop-shadow-[0_6px_10px_rgba(0,0,0,0.35)] sm:h-36 sm:w-36"
           >
         </picture>
       </div>

@@ -18,6 +18,7 @@ npm run build      # Nitro output in .output/
 
 ## Content rules
 
+- **Logo:** official artwork supplied by Nick (Oct 10, 2026), in `public/media/brand/`. The favicons are generated from the NC emblem.
 - **Sources:** the public Instagram profile (NINO, Buying and Selling) and its posts. Every photo on the page comes from a public post and is stored in `public/media/ig/`. For each photo, `app/data/media.ts` records the source post URL, post date, verbatim caption and alt text.
 - **Contact:** Instagram is the primary contact (`site.instagramUrl`). The "Find Nino at a show" button goes to his OnTreasure vendor profile (`site.onTreasureUrl`). The page lists no event dates.
 - **Not on the page:** no stock, prices, grades, shipping, payment methods or guarantees. Pictured cards are labeled as past posts. Two photos were left out on purpose: one shows price tags that couldn't be cropped out cleanly (the Whatnot lunch-show close-up), and one shows a young private individual (`Dc9MbLkyc7A`). The hero photo is cropped to remove price labels on the table.

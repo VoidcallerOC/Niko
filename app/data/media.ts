@@ -1,6 +1,6 @@
 /**
  * Photos used on the homepage — every one comes from a public post on
- * https://www.instagram.com/ninoscollectibles/ and is stored locally in
+ * https://www.instagram.com/ninoscollectibles/ (the logo is supplied artwork; see `logo`) and is stored locally in
  * `public/media/ig/` (no Instagram CDN links, which expire).
  *
  * `caption` is the post caption as published (dot spacers and hashtags removed);
@@ -32,11 +32,25 @@ export interface IgPhoto {
 
 const ig = (name: string) => `/media/ig/${name}`
 
+/**
+ * Official logo artwork supplied by Nick on Oct 10, 2026 (transparent background,
+ * 1254×1254 source). `emblem` is the NC mark + ring cropped from it for small sizes;
+ * `full` includes the NINO'S / COLLECTIBLES wordmark.
+ */
 export const logo = {
-  src: '/media/ig/logo-150.webp',
-  fallback: '/media/ig/logo-150.png',
-  alt: "Nino's Collectibles logo: a red and white brush-stroke NC on black",
-  source: 'Instagram profile picture, https://www.instagram.com/ninoscollectibles/ (150×150, largest size served publicly)',
+  emblem: {
+    src: '/media/brand/emblem-256.webp',
+    srcset: '/media/brand/emblem-128.webp 128w, /media/brand/emblem-256.webp 256w',
+    fallback: '/media/brand/emblem-256.png',
+  },
+  full: {
+    src: '/media/brand/logo-full-640.webp',
+    srcset:
+      '/media/brand/logo-full-320.webp 320w, /media/brand/logo-full-640.webp 640w, /media/brand/logo-full-1200.webp 1200w',
+    fallback: '/media/brand/logo-full-640.png',
+  },
+  alt: "Nino's Collectibles logo: a red N and white C inside a red brush ring",
+  fullAlt: "Nino's Collectibles logo: red and white NC monogram in a red brush ring above the words Nino's Collectibles",
 } as const
 
 export const photos = {

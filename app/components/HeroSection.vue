@@ -7,16 +7,16 @@ const hero = photos.vendorSolo
 <template>
   <section aria-labelledby="hero-title" class="relative overflow-hidden bg-nc-ink text-white">
     <!-- Photo: full-bleed on phones, right-hand 58% on desktop -->
-    <figure class="relative lg:absolute lg:inset-y-0 lg:right-0 lg:w-[58%]">
+    <figure class="relative lg:absolute lg:inset-y-0 lg:right-0 lg:w-[64%]">
       <IgImage
         :photo="hero"
         eager
-        sizes="(min-width: 1024px) 58vw, 100vw"
+        sizes="(min-width: 1024px) 64vw, 100vw"
         class="aspect-[4/5] max-h-[68svh] w-full object-cover object-[62%_22%] sm:aspect-[16/11] lg:aspect-auto lg:h-full lg:max-h-none"
       />
       <div
         aria-hidden="true"
-        class="absolute inset-0 bg-gradient-to-t from-nc-ink via-nc-ink/10 to-transparent lg:bg-gradient-to-r lg:from-nc-ink lg:via-nc-ink/20 lg:to-transparent"
+        class="absolute inset-0 bg-gradient-to-t from-nc-ink from-12% via-nc-ink/70 via-38% to-transparent to-70% lg:bg-gradient-to-r lg:from-nc-ink lg:from-10% lg:via-nc-ink/55 lg:via-38% lg:to-transparent lg:to-72%"
       />
       <figcaption
         class="absolute top-3 right-3 max-w-[15rem] rounded-md bg-nc-ink/80 px-3 py-2 text-caption text-white/90 backdrop-blur-sm lg:top-auto lg:right-5 lg:bottom-5"

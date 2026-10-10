@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { IgPhoto } from '~/data/media'
-import { logo } from '~/data/media'
 import { site } from '~/data/site'
 
 /**
@@ -94,47 +93,48 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <figure class="relative" :data-reel-state="state">
+  <!--
+    Phones: cover and caption side by side so the 9:16 cover doesn't tower.
+    sm and up: a single column whose width follows the state (15rem cover, 21rem embed).
+  -->
+  <figure
+    :class="[
+      'grid grid-cols-[9.5rem_1fr] items-end gap-4 sm:block',
+      state === 'embedded' ? 'sm:w-[21rem]' : 'sm:w-[15rem]',
+    ]"
+    :data-reel-state="state"
+  >
     <!-- Fallback: linked cover. Shown until the embed has actually rendered. -->
     <a
       v-show="state !== 'embedded'"
       :href="reel.postUrl"
       target="_blank"
       rel="noopener noreferrer"
-      class="group relative block w-full max-w-[15rem] overflow-hidden rounded-sm"
+      class="group relative block w-full overflow-hidden rounded-sm"
       data-reel-fallback
     >
-      <IgImage :photo="reel" sizes="15rem" class="aspect-[9/16] w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
+      <IgImage :photo="reel" sizes="(min-width: 640px) 15rem, 9.5rem" class="aspect-[9/16] w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
       <span
-        class="absolute inset-x-2 bottom-2 flex items-center justify-center gap-2 rounded-md bg-nc-ink/85 px-3 py-2.5 text-sm font-semibold text-white backdrop-blur-sm group-hover:bg-nc-red"
+        class="absolute inset-x-2 bottom-2 flex items-center justify-center gap-2 rounded-md bg-nc-ink/85 px-2 py-2 text-center text-xs font-semibold text-white backdrop-blur-sm group-hover:bg-nc-red sm:px-3 sm:py-2.5 sm:text-sm"
       >
         <IconInstagram class="h-4 w-4 shrink-0" />
-        Watch Reel on Instagram
-        <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 11 11 5M6 5h5v5" /></svg>
+        <span>Watch on Instagram</span>
       </span>
       <span class="sr-only">(opens Nino’s Reel on Instagram in a new tab)</span>
     </a>
-    <picture v-show="state !== 'embedded'">
-      <source :srcset="logo.emblem.srcset" sizes="6rem" type="image/webp">
-      <img
-        :src="logo.emblem.fallback"
-        alt=""
-        width="256"
-        height="256"
-        class="pointer-events-none absolute top-[-1rem] left-[calc(min(100%,15rem)-3rem)] h-16 w-16 drop-shadow-[0_4px_8px_rgba(0,0,0,0.35)] sm:h-20 sm:w-20"
-      >
-    </picture>
 
     <!-- Official embed host: laid out (so the iframe can measure) but hidden until rendered. -->
     <div
       ref="host"
-      :class="state === 'embedded' ? 'w-full max-w-[21rem]' : 'pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden opacity-0'"
+      :class="state === 'embedded' ? 'col-span-2 w-full' : 'pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0'"
       :aria-hidden="state === 'embedded' ? undefined : 'true'"
     />
 
-    <figcaption class="mt-4 max-w-[21rem] text-caption text-nc-mist">
-      “{{ reel.caption }}”<span class="block">From Nino’s Reel, {{ formatPostDate(reel.postDate) }}</span>
+    <figcaption :class="['text-caption text-nc-mist', state === 'embedded' ? 'col-span-2 mt-3' : 'sm:mt-3']">
+      <p class="text-[0.9375rem] leading-snug font-medium text-white">“{{ reel.caption }}”</p>
+      <p class="mt-1">From Nino’s Reel, {{ formatPostDate(reel.postDate) }}</p>
       <a
+        v-if="state === 'embedded'"
         :href="reel.postUrl"
         target="_blank"
         rel="noopener noreferrer"

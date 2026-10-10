@@ -8,8 +8,8 @@ const [feature, ...rest] = feed
   <section id="feed" aria-labelledby="feed-title" class="bg-nc-coal">
     <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-24">
       <!-- Intro + feature image -->
-      <div class="grid gap-8 lg:grid-cols-12 lg:items-end lg:gap-10">
-        <div class="lg:col-span-5 lg:pb-12">
+      <div class="grid gap-8 lg:grid-cols-12 lg:items-center lg:gap-10">
+        <div class="lg:col-span-5">
           <p class="eyebrow">From the feed</p>
           <h2 id="feed-title" class="mt-3 text-title">Recent pulls, deals and pack rips</h2>
           <p class="mt-4 max-w-md text-nc-mist">
@@ -34,15 +34,12 @@ const [feature, ...rest] = feed
         </figure>
       </div>
 
-      <!-- Staggered feed: natural aspect ratios, offset columns -->
+      <!-- Five-up strip: tops aligned so captions line up; last tile goes full width on phones -->
       <ul role="list" class="mt-10 grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-5 lg:mt-16 lg:grid-cols-5 lg:gap-x-6">
         <li
           v-for="(photo, i) in rest"
           :key="photo.id"
-          :class="[
-            i % 2 === 1 ? 'mt-8 lg:mt-14' : '',
-            i === rest.length - 1 && rest.length % 2 === 1 ? 'col-span-2 lg:col-span-1' : '',
-          ]"
+          :class="i === rest.length - 1 && rest.length % 2 === 1 ? 'col-span-2 lg:col-span-1' : ''"
         >
           <figure>
             <div class="overflow-hidden rounded-sm bg-nc-ink">

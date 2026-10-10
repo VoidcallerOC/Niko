@@ -39,13 +39,13 @@ const reasons = [
             :href="r.to === 'instagram' ? site.instagramUrl : site.onTreasureUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="group flex items-start justify-between gap-4 py-4 sm:block sm:pt-5"
+            class="group block py-4 sm:pt-5"
           >
-            <span>
-              <span class="block font-display text-2xl font-bold">{{ r.title }}</span>
-              <span class="mt-1 block text-[0.9375rem] text-white/70">{{ r.body }}</span>
+            <span class="flex items-center justify-between gap-4">
+              <span class="font-display text-2xl font-bold">{{ r.title }}</span>
+              <span aria-hidden="true" class="text-xl text-nc-red transition-transform group-hover:translate-x-1">→</span>
             </span>
-            <span aria-hidden="true" class="mt-1 text-xl text-nc-red transition-transform group-hover:translate-x-1 sm:mt-3 sm:inline-block">→</span>
+            <span class="mt-1 block max-w-[28rem] text-[0.9375rem] text-white/70">{{ r.body }}</span>
             <span class="sr-only">
               ({{ r.to === 'instagram' ? `opens ${site.handle} on Instagram` : 'opens Nino’s OnTreasure profile' }} in a new tab)
             </span>

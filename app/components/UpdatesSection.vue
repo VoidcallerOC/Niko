@@ -23,7 +23,7 @@ const lunch = photos.whatnotLunch
               :href="site.instagramUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="group grid grid-cols-[5.5rem_1fr_auto] items-center gap-4 py-5 sm:grid-cols-[7rem_1fr_auto] sm:gap-6"
+              class="group grid grid-cols-[5rem_1fr] items-start gap-4 py-5 sm:grid-cols-[7rem_1fr] sm:items-center sm:gap-6"
             >
               <IgImage :photo="lunch" sizes="7rem" class="aspect-square w-full rounded-sm object-cover" />
               <span>
@@ -32,9 +32,8 @@ const lunch = photos.whatnotLunch
                   Nino has gone live on Whatnot, including a lunch show in September. When the next one’s
                   on, the time and link are posted on Instagram.
                 </span>
-                <span class="mt-2 block text-sm font-semibold text-nc-red-bright group-hover:underline">Get show updates</span>
+                <span class="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-nc-red-bright group-hover:underline">Get show updates <span aria-hidden="true" class="transition-transform group-hover:translate-x-0.5">→</span></span>
               </span>
-              <span aria-hidden="true" class="text-xl text-white/60 transition-transform group-hover:translate-x-1">→</span>
               <span class="sr-only">(opens {{ site.handle }} on Instagram in a new tab)</span>
             </a>
           </li>
@@ -43,7 +42,7 @@ const lunch = photos.whatnotLunch
               :href="site.instagramUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="group grid grid-cols-[5.5rem_1fr_auto] items-center gap-4 py-5 sm:grid-cols-[7rem_1fr_auto] sm:gap-6"
+              class="group grid grid-cols-[5rem_1fr] items-start gap-4 py-5 sm:grid-cols-[7rem_1fr] sm:items-center sm:gap-6"
             >
               <span class="grid aspect-square w-full place-items-center rounded-sm bg-nc-ink">
                 <picture>
@@ -57,9 +56,8 @@ const lunch = photos.whatnotLunch
                   Pulls, deals and photos from the table land on {{ site.handle }}. Follow along to
                   catch them.
                 </span>
-                <span class="mt-2 block text-sm font-semibold text-nc-red-bright group-hover:underline">Follow on Instagram</span>
+                <span class="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-nc-red-bright group-hover:underline">Follow on Instagram <span aria-hidden="true" class="transition-transform group-hover:translate-x-0.5">→</span></span>
               </span>
-              <span aria-hidden="true" class="text-xl text-white/60 transition-transform group-hover:translate-x-1">→</span>
               <span class="sr-only">(opens {{ site.handle }} on Instagram in a new tab)</span>
             </a>
           </li>

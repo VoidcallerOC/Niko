@@ -377,6 +377,22 @@ const vercelBase = { VERCEL: '1', VERCEL_ENV: 'preview', REDIS_URL: `redis://127
   await stopApp(v)
   redis('-n', '1', 'flushdb')
 }
+{
+  // Dedicated admin subdomain: its root opens the admin; the public site stays put.
+  const AHOST = 'admin.example.test'
+  const a = await startApp(3510, { ...vercelBase, VERCEL_ENV: 'production', NUXT_SESSION_SECRET: SECRET, NUXT_ADMIN_SETUP_CODE: SETUP_CODE,
+    NUXT_SQUARE_APP_ID: 'sq0idp-FAKEPRODAPP', NUXT_SQUARE_APP_SECRET: 'fake-secret-for-tests', NUXT_SQUARE_ENV: 'production',
+    NUXT_SQUARE_REDIRECT_URL: `https://${AHOST}/api/admin/auth/square/callback` })
+  const AB = 'http://localhost:3510'
+  const root = await req(AB, null, '/', { headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': AHOST } })
+  ok('Admin subdomain: its root opens the admin', root.status === 302 && root.location === '/admin', `${root.status} ${root.location}`)
+  const pub = await req(AB, null, '/', { headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'www.example.test' } })
+  ok('Admin subdomain: the public homepage on the main domain is unchanged', pub.status === 200 && pub.text.includes('id="feed"'), String(pub.status))
+  const moved = await req(AB, null, '/admin/login', { headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'www.example.test' } })
+  ok('Admin subdomain: /admin on the main domain moves to the subdomain', moved.status === 302 && moved.location === `https://${AHOST}/admin/login`, moved.location)
+  await stopApp(a)
+  redis('-n', '1', 'flushdb')
+}
 
 // --- D. Demo mode never touches real data ----------------------------------------------
 const before = redis('--scan', '--pattern', '*').split('\n').sort().join(',')

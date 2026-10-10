@@ -17,6 +17,13 @@ export default defineEventHandler(async (event) => {
   const path = event.path.split('?')[0] ?? ''
   const isApi = path === '/api/admin' || path.startsWith('/api/admin/')
   const isPage = path === '/admin' || path.startsWith('/admin/')
+
+  // A dedicated admin subdomain (the registered callback host is admin.*)
+  // opens the admin at its root instead of the public homepage.
+  if (path === '/' && event.method === 'GET') {
+    const admin = canonicalHost()
+    if (admin.startsWith('admin.') && requestHost(event) === admin) return sendRedirect(event, '/admin', 302)
+  }
   if (!isApi && !isPage) return
 
   setHeader(event, 'Cache-Control', 'no-store')

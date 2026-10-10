@@ -7,7 +7,7 @@ const lunch = photos.whatnotLunch
 
 <template>
   <section id="live" aria-labelledby="live-title" class="bg-nc-coal/80">
-    <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-20">
+    <div class="wrap section-pad">
       <div class="grid gap-8 lg:grid-cols-12">
         <div class="lg:col-span-4">
           <p class="eyebrow">Live shows &amp; updates</p>

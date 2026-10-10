@@ -84,6 +84,22 @@
   }
 }
 
+/* Shared page container: one content width and gutter for every band. */
+@utility wrap {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6;
+}
+
+/* Shared vertical rhythm for content sections. */
+@utility section-pad {
+  @apply py-14 sm:py-16 lg:py-24;
+}
+
+/* Header navigation link: 44px target, visible hover/focus. */
+@utility nav-link {
+  @apply inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-white/75 underline-offset-8 transition-colors;
+  @apply hover:text-white hover:underline hover:decoration-nc-red hover:decoration-2;
+}
+
 /* Small section label: sentence case, red, with a short rule. */
 @utility eyebrow {
   @apply inline-flex items-center gap-2.5 text-sm font-semibold text-nc-red-bright;

@@ -19,14 +19,14 @@ const hero = photos.vendorSolo
         class="absolute inset-0 bg-gradient-to-t from-nc-ink from-12% via-nc-ink/70 via-38% to-transparent to-70% lg:bg-gradient-to-r lg:from-nc-ink lg:from-10% lg:via-nc-ink/55 lg:via-38% lg:to-transparent lg:to-72%"
       />
       <figcaption
-        class="absolute top-3 right-3 max-w-[15rem] rounded-md bg-nc-ink/80 px-3 py-2 text-caption text-white/90 backdrop-blur-sm lg:top-auto lg:right-5 lg:bottom-5"
+        class="absolute top-3 left-3 max-w-[11rem] rounded-md bg-nc-ink/80 px-2.5 py-1.5 text-xs text-white/90 backdrop-blur-sm sm:left-auto sm:right-3 sm:max-w-[15rem] sm:px-3 sm:py-2 sm:text-caption lg:top-auto lg:right-5 lg:bottom-5"
       >
         “{{ hero.caption }}”
         <span class="mt-0.5 block text-white/55">Nino on Instagram, {{ formatPostDate(hero.postDate) }}</span>
       </figcaption>
     </figure>
 
-    <div class="relative mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:flex lg:min-h-[min(calc(100svh-4rem),46rem)] lg:items-center lg:py-20">
+    <div class="wrap relative pb-10 lg:flex lg:min-h-[min(calc(100svh-4rem),46rem)] lg:items-center lg:py-20">
       <div class="-mt-28 sm:-mt-32 lg:mt-0 lg:w-[52%]">
         <p class="eyebrow text-white/80 before:bg-nc-red">Pokémon &amp; One Piece cards, bought and sold</p>
         <h1
@@ -40,7 +40,7 @@ const hero = photos.vendorSolo
           packs and sets up at card shows.
         </p>
         <div class="mt-7 flex flex-col gap-3 sm:flex-row">
-          <LinkButton to="instagram" size="lg" block>Message Nino on Instagram</LinkButton>
+          <LinkButton to="instagram" size="lg" block>Message on Instagram</LinkButton>
           <LinkButton to="ontreasure" size="lg" variant="outline-light" block>Find Nino at a show</LinkButton>
         </div>
         <a href="#feed" class="mt-5 inline-flex min-h-11 items-center gap-1.5 text-[0.9375rem] font-medium text-white/70 underline-offset-4 hover:text-white hover:underline">

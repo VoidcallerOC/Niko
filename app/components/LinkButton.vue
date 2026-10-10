@@ -8,8 +8,10 @@ const props = withDefaults(
     size?: 'md' | 'lg'
     /** Stretch to the container width on phones. */
     block?: boolean
+    /** Below sm, show only the leading icon (label stays for screen readers). */
+    iconOnlyOnPhone?: boolean
   }>(),
-  { variant: 'red', size: 'md', block: false },
+  { variant: 'red', size: 'md', block: false, iconOnlyOnPhone: false },
 )
 
 const href = computed(() =>
@@ -53,6 +55,7 @@ const sizes = {
       variants[variant],
       sizes[size],
       block ? 'w-full sm:w-auto' : '',
+      iconOnlyOnPhone ? 'max-sm:min-w-11 max-sm:gap-0 max-sm:px-0' : '',
     ]"
   >
     <IconInstagram v-if="to === 'instagram'" class="h-[1.1em] w-[1.1em] shrink-0" />
@@ -61,7 +64,7 @@ const sizes = {
       v-if="external"
       aria-hidden="true"
       viewBox="0 0 16 16"
-      class="h-3.5 w-3.5 shrink-0 opacity-70 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+      :class="['h-3.5 w-3.5 shrink-0 opacity-70 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5', iconOnlyOnPhone ? 'max-sm:hidden' : '']"
       fill="none"
       stroke="currentColor"
       stroke-width="2"

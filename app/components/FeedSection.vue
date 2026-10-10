@@ -6,7 +6,7 @@ const [feature, ...rest] = feed
 
 <template>
   <section id="feed" aria-labelledby="feed-title" class="bg-nc-coal/80">
-    <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-24">
+    <div class="wrap section-pad">
       <!-- Intro + feature image -->
       <div class="grid gap-8 lg:grid-cols-12 lg:items-center lg:gap-10">
         <div class="lg:col-span-5">
@@ -35,11 +35,11 @@ const [feature, ...rest] = feed
       </div>
 
       <!-- Five-up strip: tops aligned so captions line up; last tile goes full width on phones -->
-      <ul role="list" class="mt-10 grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-5 lg:mt-16 lg:grid-cols-5 lg:gap-x-6">
+      <ul role="list" class="mt-10 grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-5 md:grid-cols-3 lg:mt-16 lg:grid-cols-5 lg:gap-x-6">
         <li
           v-for="(photo, i) in rest"
           :key="photo.id"
-          :class="i === rest.length - 1 && rest.length % 2 === 1 ? 'col-span-2 lg:col-span-1' : ''"
+          :class="i === rest.length - 1 && rest.length % 2 === 1 ? 'col-span-2 md:col-span-1' : ''"
         >
           <figure>
             <div class="overflow-hidden rounded-sm bg-nc-ink">
@@ -48,7 +48,7 @@ const [feature, ...rest] = feed
                 sizes="(min-width: 1024px) 20vw, 50vw"
                 :class="[
                   'w-full object-cover transition-transform duration-500 hover:scale-[1.03]',
-                  i === rest.length - 1 && rest.length % 2 === 1 ? 'aspect-[4/3] lg:aspect-[3/4]' : 'aspect-[3/4]',
+                  i === rest.length - 1 && rest.length % 2 === 1 ? 'aspect-[4/3] md:aspect-[3/4]' : 'aspect-[3/4]',
                 ]"
               />
             </div>

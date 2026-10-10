@@ -99,7 +99,7 @@ onBeforeUnmount(() => {
   -->
   <figure
     :class="[
-      'grid grid-cols-[9.5rem_1fr] items-end gap-4 sm:block',
+      'grid grid-cols-[8.5rem_1fr] items-end gap-4 min-[360px]:grid-cols-[9.5rem_1fr] sm:block',
       state === 'embedded' ? 'sm:w-[21rem]' : 'sm:w-[15rem]',
     ]"
     :data-reel-state="state"

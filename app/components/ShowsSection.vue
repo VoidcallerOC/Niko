@@ -77,7 +77,7 @@ useHead(() => ({
 
 <template>
   <section id="shows" aria-labelledby="shows-title" class="bg-transparent">
-    <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-24">
+    <div class="wrap section-pad">
       <div class="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <div class="max-w-xl">
           <p class="eyebrow">Vending events</p>
@@ -149,7 +149,7 @@ useHead(() => ({
 
       <p class="mt-4 text-caption text-nc-mist">
         Dates and locations come from
-        <a :href="site.onTreasureUrl" target="_blank" rel="noopener noreferrer" class="underline underline-offset-2 hover:text-white">Nino’s OnTreasure profile<span class="sr-only"> (opens in a new tab)</span></a>.
+        <a :href="site.onTreasureUrl" target="_blank" rel="noopener noreferrer" class="py-3.5 underline underline-offset-2 hover:text-white">Nino’s OnTreasure profile<span class="sr-only"> (opens in a new tab)</span></a>.
       </p>
 
       <!-- At the table -->

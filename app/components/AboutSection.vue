@@ -5,7 +5,7 @@ import { site } from '~/data/site'
 
 <template>
   <section id="about" aria-labelledby="about-title" class="bg-transparent">
-    <div class="mx-auto grid max-w-5xl items-center gap-8 px-4 py-14 sm:grid-cols-[auto_1fr] sm:gap-12 sm:px-6 lg:gap-16 lg:py-20">
+    <div class="wrap section-pad grid items-center gap-8 sm:grid-cols-[auto_1fr] sm:gap-12 lg:gap-16">
       <ReelEmbed :reel="photos.reelHeat" class="order-2 sm:order-1" />
 
       <div class="order-1 sm:order-2">

@@ -10,7 +10,7 @@ const reasons = [
 
 <template>
   <section id="contact" aria-labelledby="contact-title" class="bg-nc-coal/80 text-white">
-    <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-20">
+    <div class="wrap section-pad">
       <div class="grid items-center gap-8 md:grid-cols-[13rem_1fr] lg:grid-cols-[16rem_1fr] lg:gap-14">
         <div class="mx-auto w-40 md:w-full">
           <BrandMark variant="full" />

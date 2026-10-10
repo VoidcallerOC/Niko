@@ -1,65 +1,57 @@
 <script setup lang="ts">
-import { logo } from '~/data/media'
 import { site } from '~/data/site'
 
 const reasons = [
-  { n: '01', title: 'Buying', body: 'Saw a card in a post? DM Nino and ask if it’s still around.', to: 'instagram' },
-  { n: '02', title: 'Selling', body: 'Got cards to move? Send Nino photos of what you have.', to: 'instagram' },
-  { n: '03', title: 'Shows', body: 'Want to meet at a show? Check his OnTreasure profile for where he’s vending.', to: 'ontreasure' },
+  { title: 'Buying', body: 'Saw a card in a post? Ask Nino if it’s still around.', to: 'instagram' },
+  { title: 'Selling', body: 'Got cards to move? Send Nino photos of what you have.', to: 'instagram' },
+  { title: 'Shows', body: 'Want to meet in person? See where he’s vending on OnTreasure.', to: 'ontreasure' },
 ] as const
 </script>
 
 <template>
-  <section id="contact" aria-labelledby="contact-title" class="border-t-8 border-nc-red bg-white">
-    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-24">
-      <div class="flex items-start justify-between gap-6">
-        <div>
-          <p class="meta text-nc-red">05 — Contact</p>
-          <h2 id="contact-title" class="mt-3 font-display text-5xl leading-[0.9] uppercase sm:text-7xl">
-            Hit the DMs.
-          </h2>
-          <p class="mt-4 max-w-xl text-lg text-nc-muted">
-            Instagram is the way to reach Nino about cards, deals and shows.
-          </p>
+  <section id="contact" aria-labelledby="contact-title" class="bg-nc-ink text-white">
+    <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-20">
+      <div class="grid items-center gap-8 md:grid-cols-[13rem_1fr] lg:grid-cols-[16rem_1fr] lg:gap-14">
+        <div class="mx-auto w-40 md:w-full">
+          <BrandMark variant="full" />
         </div>
-        <picture class="hidden shrink-0 sm:block">
-          <source :srcset="logo.full.srcset" sizes="13rem" type="image/webp">
-          <img :src="logo.full.fallback" alt="" width="640" height="640" class="h-44 w-44 lg:h-52 lg:w-52">
-        </picture>
+
+        <div>
+          <p class="eyebrow">Contact</p>
+          <h2 id="contact-title" class="mt-3 text-title">Hit the DMs</h2>
+          <p class="mt-3 text-lede text-white/75">Instagram is the way to reach Nino about cards, deals and shows.</p>
+          <a
+            :href="site.instagramUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-5 inline-flex min-h-11 max-w-full items-center gap-3 font-display text-[clamp(1.875rem,7vw,3.25rem)] leading-none font-bold break-all text-white hover:text-nc-red sm:break-normal"
+          >
+            <IconInstagram class="h-[0.8em] w-[0.8em] shrink-0 text-nc-red" />
+            <span>{{ site.handle }}</span>
+            <span class="sr-only">(opens on Instagram in a new tab)</span>
+          </a>
+        </div>
       </div>
 
-      <a
-        :href="site.instagramUrl"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="group mt-8 inline-flex min-h-11 max-w-full items-center gap-3 font-display text-[clamp(2rem,9vw,5.5rem)] leading-none break-all uppercase hover:text-nc-red sm:break-normal"
-      >
-        <IconInstagram class="h-[0.7em] w-[0.7em] shrink-0 text-nc-red" />
-        <span>{{ site.handle }}</span>
-        <span class="sr-only">(opens on Instagram in a new tab)</span>
-      </a>
-
-      <ol role="list" class="mt-12 border-t border-nc-ink">
-        <li v-for="r in reasons" :key="r.n" class="border-b border-nc-line">
+      <ul role="list" class="mt-10 grid border-t border-white/15 sm:grid-cols-3 sm:gap-6 sm:border-t-0">
+        <li v-for="r in reasons" :key="r.title" class="border-b border-white/15 sm:border-t sm:border-b-0">
           <a
             :href="r.to === 'instagram' ? site.instagramUrl : site.onTreasureUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="group grid grid-cols-[2.5rem_1fr_auto] items-center gap-x-4 gap-y-1 py-5 sm:grid-cols-[4rem_10rem_1fr_auto]"
+            class="group flex items-start justify-between gap-4 py-4 sm:block sm:pt-5"
           >
-            <span class="meta text-nc-red">{{ r.n }}</span>
-            <span class="font-display text-2xl uppercase">{{ r.title }}</span>
-            <span class="col-start-2 text-nc-muted sm:col-start-auto">{{ r.body }}</span>
-            <span
-              aria-hidden="true"
-              class="col-start-3 row-span-2 row-start-1 text-2xl transition-transform group-hover:translate-x-1 sm:col-start-auto sm:row-span-1 sm:row-start-auto"
-            >→</span>
+            <span>
+              <span class="block font-display text-2xl font-bold">{{ r.title }}</span>
+              <span class="mt-1 block text-[0.9375rem] text-white/70">{{ r.body }}</span>
+            </span>
+            <span aria-hidden="true" class="mt-1 text-xl text-nc-red transition-transform group-hover:translate-x-1 sm:mt-3 sm:inline-block">→</span>
             <span class="sr-only">
               ({{ r.to === 'instagram' ? `opens ${site.handle} on Instagram` : 'opens Nino’s OnTreasure profile' }} in a new tab)
             </span>
           </a>
         </li>
-      </ol>
+      </ul>
     </div>
   </section>
 </template>

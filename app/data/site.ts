@@ -13,6 +13,6 @@ export const site = {
 export const navLinks = [
   { href: '#feed', label: 'Feed' },
   { href: '#shows', label: 'Shows' },
-  { href: '#live', label: 'Whatnot' },
+  { href: '#live', label: 'Live & updates' },
   { href: '#about', label: 'About' },
 ] as const

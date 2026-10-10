@@ -23,6 +23,16 @@ npm run build      # Nitro output in .output/
 - **Contact:** Instagram is the primary contact (`site.instagramUrl`). The "Find Nino at a show" button goes to his OnTreasure vendor profile (`site.onTreasureUrl`). The page lists no event dates.
 - **Not on the page:** no stock, prices, grades, shipping, payment methods or guarantees. Pictured cards are labeled as past posts. Two photos were left out on purpose: one shows price tags that couldn't be cropped out cleanly (the Whatnot lunch-show close-up), and one shows a young private individual (`Dc9MbLkyc7A`). The hero photo is cropped to remove price labels on the table.
 
+## Typography
+
+- Display: Barlow Condensed 700/800 (800 italic only in the hero). Text: Inter (variable).
+- Both fonts are self-hosted from npm (`@fontsource/barlow-condensed`, `@fontsource-variable/inter`), so the page makes no font requests to Google.
+- The type scale is defined as `@theme` tokens in `app/assets/css/main.css`: `text-hero`, `text-title`, `text-subtitle`, `text-lede` and `text-caption`.
+
+## Reel embed
+
+`ReelEmbed.vue` renders Nino's Reel as a linked cover on the server. In the browser it then tries Instagram's official `embed.js` and swaps in the embed only once Instagram reports it has rendered. If the script errors or doesn't render within 10 seconds, the linked cover stays. The embed never autoplays.
+
 ## Structure
 
 ```

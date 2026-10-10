@@ -34,12 +34,12 @@ const variants = {
   red: 'bg-nc-red text-white hover:bg-nc-red-dark',
   ink: 'bg-nc-ink text-white hover:bg-black',
   white: 'bg-white text-nc-ink hover:bg-nc-paper',
-  'outline-light': 'text-white ring-2 ring-inset ring-white/70 hover:bg-white hover:text-nc-ink',
-  'outline-ink': 'text-nc-ink ring-2 ring-inset ring-nc-ink hover:bg-nc-ink hover:text-white',
+  'outline-light': 'text-white ring-1 ring-inset ring-white/50 hover:bg-white hover:text-nc-ink',
+  'outline-ink': 'text-nc-ink ring-1 ring-inset ring-nc-ink/70 hover:bg-nc-ink hover:text-white',
 } as const
 const sizes = {
-  md: 'min-h-11 px-5 text-sm',
-  lg: 'min-h-14 px-7 text-base',
+  md: 'min-h-11 px-4 text-[0.9375rem]',
+  lg: 'min-h-13 px-6 text-base',
 } as const
 </script>
 
@@ -49,19 +49,19 @@ const sizes = {
     :target="external ? '_blank' : undefined"
     :rel="external ? 'noopener noreferrer' : undefined"
     :class="[
-      'group inline-flex items-center justify-center gap-2.5 rounded-sm font-semibold tracking-wide uppercase transition-colors',
+      'group inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-colors',
       variants[variant],
       sizes[size],
       block ? 'w-full sm:w-auto' : '',
     ]"
   >
-    <IconInstagram v-if="to === 'instagram'" class="h-[1.15em] w-[1.15em] shrink-0" />
+    <IconInstagram v-if="to === 'instagram'" class="h-[1.1em] w-[1.1em] shrink-0" />
     <span><slot /></span>
     <svg
       v-if="external"
       aria-hidden="true"
       viewBox="0 0 16 16"
-      class="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+      class="h-3.5 w-3.5 shrink-0 opacity-70 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
       fill="none"
       stroke="currentColor"
       stroke-width="2"

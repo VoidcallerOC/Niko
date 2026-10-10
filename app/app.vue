@@ -11,7 +11,7 @@
       <HeroSection />
       <FeedSection />
       <ShowsSection />
-      <WhatnotSection />
+      <UpdatesSection />
       <AboutSection />
       <ContactSection />
     </main>

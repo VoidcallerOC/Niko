@@ -5,63 +5,48 @@ const hero = photos.vendorSolo
 </script>
 
 <template>
-  <section aria-labelledby="hero-title" class="relative isolate overflow-hidden bg-nc-ink text-white">
-    <div class="mx-auto grid max-w-7xl lg:grid-cols-12 lg:gap-10 lg:px-6">
-      <div class="px-4 pt-10 pb-8 sm:px-6 lg:col-span-6 lg:px-0 lg:pt-20 lg:pb-16">
-        <p class="meta text-white/60">
-          <span class="text-nc-red">●</span> Pokémon · One Piece · Buying &amp; selling
-        </p>
+  <section aria-labelledby="hero-title" class="relative overflow-hidden bg-nc-ink text-white">
+    <!-- Photo: full-bleed on phones, right-hand 58% on desktop -->
+    <figure class="relative lg:absolute lg:inset-y-0 lg:right-0 lg:w-[58%]">
+      <IgImage
+        :photo="hero"
+        eager
+        sizes="(min-width: 1024px) 58vw, 100vw"
+        class="aspect-[4/5] max-h-[68svh] w-full object-cover object-[62%_22%] sm:aspect-[16/11] lg:aspect-auto lg:h-full lg:max-h-none"
+      />
+      <div
+        aria-hidden="true"
+        class="absolute inset-0 bg-gradient-to-t from-nc-ink via-nc-ink/10 to-transparent lg:bg-gradient-to-r lg:from-nc-ink lg:via-nc-ink/20 lg:to-transparent"
+      />
+      <figcaption
+        class="absolute top-3 right-3 max-w-[15rem] rounded-md bg-nc-ink/80 px-3 py-2 text-caption text-white/90 backdrop-blur-sm lg:top-auto lg:right-5 lg:bottom-5"
+      >
+        “{{ hero.caption }}”
+        <span class="mt-0.5 block text-white/55">Nino on Instagram, {{ formatPostDate(hero.postDate) }}</span>
+      </figcaption>
+    </figure>
+
+    <div class="relative mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:flex lg:min-h-[min(calc(100svh-4rem),46rem)] lg:items-center lg:py-20">
+      <div class="-mt-28 sm:-mt-32 lg:mt-0 lg:w-[52%]">
+        <p class="eyebrow text-white/80 before:bg-nc-red">Pokémon &amp; One Piece cards, bought and sold</p>
         <h1
           id="hero-title"
-          class="mt-5 font-display text-[clamp(3.6rem,17vw,6rem)] lg:text-[clamp(5rem,7.4vw,7.75rem)] leading-[0.86] tracking-tight uppercase"
+          class="mt-3 text-hero font-extrabold uppercase italic [text-shadow:0_2px_24px_rgba(0,0,0,0.45)]"
         >
-          Nothing<br>but <span class="slash">heat.</span>
+          Nothing<br>but <span class="text-nc-red">heat.</span>
         </h1>
-        <p class="mt-6 max-w-lg text-lg leading-relaxed text-white/80">
+        <p class="mt-5 max-w-md text-lede text-white/80">
           Nino’s Collectibles is Nino’s own trading-card business. He buys and sells cards, rips
-          packs and vends at card shows. Seen a card on the feed? Send him a message.
+          packs and sets up at card shows.
         </p>
-
-        <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <LinkButton to="instagram" size="lg" block>Message on Instagram</LinkButton>
+        <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+          <LinkButton to="instagram" size="lg" block>Message Nino on Instagram</LinkButton>
           <LinkButton to="ontreasure" size="lg" variant="outline-light" block>Find Nino at a show</LinkButton>
         </div>
-        <a href="#feed" class="meta mt-6 inline-flex min-h-11 items-center gap-2 text-white/70 hover:text-white">
-          See cards from the feed <span aria-hidden="true">↓</span>
+        <a href="#feed" class="mt-5 inline-flex min-h-11 items-center gap-1.5 text-[0.9375rem] font-medium text-white/70 underline-offset-4 hover:text-white hover:underline">
+          Browse cards from the feed <span aria-hidden="true">↓</span>
         </a>
       </div>
-
-      <figure class="relative lg:col-span-6 lg:mt-10 lg:mb-[-1px]">
-        <IgImage
-          :photo="hero"
-          eager
-          sizes="(min-width: 1024px) 50vw, 100vw"
-          class="aspect-[5/4] w-full object-cover object-[60%_30%] lg:aspect-auto lg:h-full lg:min-h-[34rem]"
-        />
-        <figcaption
-          class="absolute right-3 bottom-3 left-3 max-w-sm bg-nc-ink/85 px-4 py-3 backdrop-blur-sm sm:left-auto"
-        >
-          <p class="text-sm leading-snug text-white">“{{ hero.caption }}”</p>
-          <p class="meta mt-1.5 text-white/55">
-            Nino on Instagram · {{ formatPostDate(hero.postDate) }}
-          </p>
-        </figcaption>
-      </figure>
-    </div>
-
-    <div class="border-t border-white/10">
-      <ul
-        class="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-5 gap-y-1 px-4 py-4 font-display text-xl tracking-wide uppercase sm:justify-start sm:px-6 sm:text-2xl"
-        aria-label="From the table banner"
-      >
-        <li>Buy</li>
-        <li aria-hidden="true" class="text-nc-red">/</li>
-        <li>Sell</li>
-        <li aria-hidden="true" class="text-nc-red">/</li>
-        <li>Trade</li>
-        <li aria-hidden="true" class="text-nc-red">/</li>
-        <li>Collect</li>
-      </ul>
     </div>
   </section>
 </template>

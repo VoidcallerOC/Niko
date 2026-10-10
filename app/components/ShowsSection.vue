@@ -1,49 +1,50 @@
 <script setup lang="ts">
 import { photos } from '~/data/media'
-import { site } from '~/data/site'
 
 const table = photos.tableDeals
+const banner = ['Buy', 'Sell', 'Trade', 'Collect'] as const
 </script>
 
 <template>
   <section id="shows" aria-labelledby="shows-title" class="bg-nc-bone">
-    <div class="mx-auto grid max-w-7xl lg:grid-cols-12">
-      <figure class="relative lg:col-span-7">
+    <div class="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:items-center lg:px-6 lg:py-24">
+      <figure class="relative lg:col-span-8 lg:col-start-1 lg:row-start-1">
         <IgImage
           :photo="table"
-          sizes="(min-width: 1024px) 58vw, 100vw"
-          class="aspect-[4/3] w-full object-cover object-[50%_70%] lg:aspect-auto lg:h-full"
+          sizes="(min-width: 1024px) 66vw, 100vw"
+          class="aspect-[4/3] w-full object-cover object-[50%_72%] lg:aspect-[16/11] lg:rounded-sm"
         />
-        <figcaption class="meta absolute bottom-3 left-3 bg-nc-bone px-2.5 py-1.5 text-nc-ink">
+        <figcaption class="absolute top-3 left-3 rounded-md bg-nc-bone/90 px-3 py-1.5 text-caption text-nc-ink backdrop-blur-sm">
           “{{ table.caption }}” · {{ formatPostDate(table.postDate) }}
         </figcaption>
       </figure>
 
-      <div class="flex flex-col justify-center px-4 py-12 sm:px-6 lg:col-span-5 lg:px-12 lg:py-24">
-        <p class="meta text-nc-red">02 — Vending events</p>
-        <h2 id="shows-title" class="mt-3 font-display text-5xl leading-[0.9] uppercase sm:text-6xl">
-          Find Nino <br>at a show.
-        </h2>
-        <p class="mt-5 text-lg leading-relaxed text-nc-muted">
-          Nino sets up at card shows. Look for the black <span class="font-semibold text-nc-ink">Nino’s
-          Collectibles</span> banner on the table. The shows he’s vending are listed on his
-          OnTreasure profile.
+      <!-- Panel overlaps the photo: below it on phones, beside it on desktop -->
+      <div
+        class="relative z-10 mx-4 -mt-14 border-t-4 border-nc-red bg-white p-6 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.35)] sm:mx-6 sm:p-8 lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:mx-0 lg:mt-0"
+      >
+        <p class="eyebrow">Vending events</p>
+        <h2 id="shows-title" class="mt-3 text-title">Find Nino at a show</h2>
+        <p class="mt-4 text-nc-muted">
+          Nino sets up at card shows. The ones he’s vending are listed on his OnTreasure profile.
+          Check there for dates before you head out.
         </p>
+        <LinkButton to="ontreasure" size="lg" class="mt-6 w-full">Find Nino at a show</LinkButton>
 
-        <LinkButton to="ontreasure" size="lg" class="mt-8 self-stretch sm:self-start">
-          Find Nino at a show
-        </LinkButton>
-        <p class="meta mt-4 text-nc-muted">
-          Opens ontreasure.com/u/ninoscollectibles · check there for dates
-        </p>
-
-        <blockquote class="mt-10 border-l-4 border-nc-red pl-4">
-          <p class="text-base leading-snug">“{{ photos.vendorSolo.caption }}”</p>
-          <footer class="meta mt-2 text-nc-muted">
-            {{ site.handle }} · {{ formatPostDate(photos.vendorSolo.postDate) }}
-          </footer>
-        </blockquote>
+        <div class="mt-6 border-t border-nc-line pt-5">
+          <p class="text-sm text-nc-muted">At the show, look for the black Nino’s Collectibles banner:</p>
+          <ul
+            class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-display text-2xl font-bold uppercase"
+            aria-label="Banner text: Buy, Sell, Trade, Collect"
+          >
+            <template v-for="(word, i) in banner" :key="word">
+              <li v-if="i > 0" aria-hidden="true" class="text-nc-red">·</li>
+              <li>{{ word }}</li>
+            </template>
+          </ul>
+        </div>
       </div>
     </div>
+    <div class="h-12 lg:hidden" aria-hidden="true" />
   </section>
 </template>

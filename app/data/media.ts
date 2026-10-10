@@ -190,6 +190,6 @@ export const feed: readonly IgPhoto[] = [
   photos.pokemon30th,
   photos.nami,
   photos.kaido,
-  photos.naruto,
   photos.robin,
+  photos.naruto,
 ]

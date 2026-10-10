@@ -6,15 +6,15 @@ withDefaults(defineProps<{ variant?: 'emblem' | 'full' }>(), { variant: 'emblem'
 
 <template>
   <picture v-if="variant === 'full'">
-    <source :srcset="logo.full.srcset" sizes="12rem" type="image/webp">
-    <img :src="logo.full.fallback" :alt="logo.fullAlt" width="640" height="640" class="h-44 w-44 sm:h-48 sm:w-48">
+    <source :srcset="logo.full.srcset" sizes="14rem" type="image/webp">
+    <img :src="logo.full.fallback" :alt="logo.fullAlt" width="640" height="640" class="h-full w-full">
   </picture>
-  <span v-else class="inline-flex items-center gap-2.5">
+  <span v-else class="inline-flex items-center gap-2">
     <picture>
       <source :srcset="logo.emblem.srcset" sizes="3rem" type="image/webp">
-      <img :src="logo.emblem.fallback" :alt="logo.alt" width="256" height="256" class="h-12 w-12 shrink-0">
+      <img :src="logo.emblem.fallback" :alt="logo.alt" width="256" height="256" class="h-11 w-11 shrink-0">
     </picture>
-    <span class="font-display text-lg leading-none tracking-wide text-white uppercase">
+    <span class="font-display text-xl leading-none font-bold tracking-wide text-white uppercase">
       Nino’s <span class="text-nc-red">Collectibles</span>
     </span>
   </span>

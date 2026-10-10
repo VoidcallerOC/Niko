@@ -3,7 +3,7 @@ import { navLinks, site } from '~/data/site'
 </script>
 
 <template>
-  <footer class="border-t border-white/10 bg-nc-ink text-white/65">
+  <footer class="border-t border-white/10 bg-nc-ink/80 text-white/65">
     <div class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:px-6 md:flex-row md:items-center md:justify-between">
       <nav aria-label="Footer">
         <ul class="flex flex-wrap gap-x-5 text-sm font-medium">

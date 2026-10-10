@@ -56,6 +56,8 @@
 
   body {
     @apply bg-nc-ink font-sans text-base leading-relaxed text-white antialiased;
+    background-image: radial-gradient(ellipse 120% 70% at 50% -10%, #1d1a18 0%, transparent 70%);
+    background-attachment: fixed;
   }
 
   h1,

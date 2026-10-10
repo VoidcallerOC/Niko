@@ -5,7 +5,7 @@ const hero = photos.vendorSolo
 </script>
 
 <template>
-  <section aria-labelledby="hero-title" class="relative overflow-hidden bg-nc-ink text-white">
+  <section aria-labelledby="hero-title" class="relative overflow-hidden bg-transparent text-white">
     <!-- Photo: full-bleed on phones, right-hand 58% on desktop -->
     <figure class="relative lg:absolute lg:inset-y-0 lg:right-0 lg:w-[64%]">
       <IgImage

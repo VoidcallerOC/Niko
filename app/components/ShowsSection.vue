@@ -1,40 +1,169 @@
 <script setup lang="ts">
 import { photos } from '~/data/media'
+import { site } from '~/data/site'
+import type { TreasureResult } from '~~/server/utils/treasureShows'
 
 const table = photos.tableDeals
 const banner = ['Buy', 'Sell', 'Trade', 'Collect'] as const
+
+/*
+ * Upcoming shows come from Nino's OnTreasure profile through /api/shows
+ * (see server/utils/treasureShows.ts). Rendered on the server so the list is
+ * in the HTML; refreshed in the browser every 5 minutes and when the tab
+ * comes back, the same way Thousand Sunny's RoadBlock does.
+ */
+const fallback = (): TreasureResult => ({ status: 'unavailable', shows: [], fetchedAt: '' })
+const { data, refresh } = await useAsyncData<TreasureResult>(
+  'shows',
+  () => $fetch<TreasureResult>('/api/shows' as string),
+  { default: fallback },
+)
+
+const shows = computed(() => data.value.shows.slice(0, 6))
+
+// Posters that fail to load (removed, blocked) fall back to the NC mark.
+const brokenPosters = ref(new Set<string>())
+const posterFailed = (slug: string) => brokenPosters.value.add(slug) && (brokenPosters.value = new Set(brokenPosters.value))
+const state = computed<'shows' | 'empty' | 'unavailable'>(() =>
+  shows.value.length ? 'shows' : data.value.status === 'ok' ? 'empty' : 'unavailable',
+)
+
+onMounted(() => {
+  const timer = window.setInterval(() => refresh(), 5 * 60 * 1000)
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') refresh()
+  }
+  document.addEventListener('visibilitychange', onVisible)
+  onBeforeUnmount(() => {
+    window.clearInterval(timer)
+    document.removeEventListener('visibilitychange', onVisible)
+  })
+})
+
+// Event structured data only for events OnTreasure actually returned.
+useHead(() => ({
+  script: shows.value.length
+    ? [
+        {
+          key: 'ld-events',
+          type: 'application/ld+json',
+          innerHTML: JSON.stringify(
+            shows.value.map((show) => ({
+              '@context': 'https://schema.org',
+              '@type': 'Event',
+              name: show.title,
+              startDate: show.startDate,
+              endDate: show.endDate,
+              eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+              url: show.url,
+              ...(show.poster ? { image: show.poster } : {}),
+              location: {
+                '@type': 'Place',
+                name: show.venue || `${show.city}, ${show.state}`,
+                address: {
+                  '@type': 'PostalAddress',
+                  addressLocality: show.city,
+                  addressRegion: show.state,
+                  addressCountry: 'US',
+                },
+              },
+            })),
+          ),
+        },
+      ]
+    : [],
+}))
 </script>
 
 <template>
-  <section id="shows" aria-labelledby="shows-title" class="bg-nc-ink">
-    <div class="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:items-center lg:px-6 lg:py-24">
-      <figure class="relative lg:col-span-8 lg:col-start-1 lg:row-start-1">
-        <IgImage
-          :photo="table"
-          sizes="(min-width: 1024px) 66vw, 100vw"
-          class="aspect-[4/3] w-full object-cover object-[50%_72%] lg:aspect-[16/11] lg:rounded-sm"
-        />
-        <figcaption class="absolute top-3 left-3 rounded-md bg-nc-ink/80 px-3 py-1.5 text-caption text-white backdrop-blur-sm">
-          “{{ table.caption }}” · {{ formatPostDate(table.postDate) }}
-        </figcaption>
-      </figure>
+  <section id="shows" aria-labelledby="shows-title" class="bg-transparent">
+    <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-24">
+      <div class="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+        <div class="max-w-xl">
+          <p class="eyebrow">Vending events</p>
+          <h2 id="shows-title" class="mt-3 text-title">Find Nino at a show</h2>
+          <p class="mt-4 text-nc-mist">
+            Nino sets up at card shows. These are the ones he’s listed as vending on OnTreasure.
+            Check the event page for hours and tickets before you head out.
+          </p>
+        </div>
+        <LinkButton to="ontreasure" size="lg" class="md:shrink-0">All shows on OnTreasure</LinkButton>
+      </div>
 
-      <!-- Panel overlaps the photo: below it on phones, beside it on desktop -->
-      <div
-        class="relative z-10 mx-4 -mt-14 border-t-4 border-nc-red bg-nc-char p-6 text-white shadow-[0_24px_50px_-20px_rgba(0,0,0,0.8)] sm:mx-6 sm:p-8 lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:mx-0 lg:mt-0"
-      >
-        <p class="eyebrow">Vending events</p>
-        <h2 id="shows-title" class="mt-3 text-title">Find Nino at a show</h2>
-        <p class="mt-4 text-nc-mist">
-          Nino sets up at card shows. The ones he’s vending are listed on his OnTreasure profile.
-          Check there for dates before you head out.
+      <!-- Upcoming shows -->
+      <ul v-if="state === 'shows'" role="list" class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6" data-shows>
+        <li v-for="show in shows" :key="show.slug">
+          <a
+            :href="show.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="group flex h-full overflow-hidden rounded-md border border-nc-rule bg-nc-char transition-colors hover:border-nc-red sm:flex-col"
+          >
+            <span class="relative w-[7.5rem] shrink-0 overflow-hidden bg-nc-ink sm:aspect-[4/3] sm:w-auto">
+              <span
+                aria-hidden="true"
+                class="absolute inset-0 grid place-items-center font-display text-3xl font-bold text-nc-rule"
+              >NC</span>
+              <img
+                v-if="show.poster && !brokenPosters.has(show.slug)"
+                :src="show.poster"
+                :alt="show.posterAlt"
+                loading="lazy"
+                decoding="async"
+                referrerpolicy="no-referrer"
+                class="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                @error="posterFailed(show.slug)"
+              >
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+              <span class="text-sm font-semibold text-nc-red-bright">{{ show.dateLabel }}</span>
+              <span class="mt-1 font-display text-2xl leading-tight font-bold text-white">{{ show.title }}</span>
+              <span class="mt-1.5 text-[0.9375rem] text-nc-mist">{{ show.location }}</span>
+              <span class="mt-auto inline-flex items-center gap-1.5 pt-4 text-sm font-semibold text-white group-hover:underline">
+                View event
+                <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 11 11 5M6 5h5v5" /></svg>
+              </span>
+              <span class="sr-only">(opens {{ show.title }} on OnTreasure in a new tab)</span>
+            </span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- Nothing listed -->
+      <div v-else-if="state === 'empty'" class="mt-10 rounded-md border border-nc-rule bg-nc-char p-6 sm:p-8" data-shows-empty>
+        <p class="font-display text-2xl font-bold">No upcoming shows posted right now</p>
+        <p class="mt-2 max-w-xl text-nc-mist">
+          Nino’s OnTreasure profile has nothing scheduled at the moment. New shows appear here as soon as
+          he lists them; Instagram usually has the heads-up first.
         </p>
-        <LinkButton to="ontreasure" size="lg" class="mt-6 w-full">Find Nino at a show</LinkButton>
+      </div>
 
-        <div class="mt-6 border-t border-nc-rule pt-5">
-          <p class="text-sm text-nc-mist">At the show, look for the black Nino’s Collectibles banner:</p>
+      <!-- OnTreasure couldn't be reached -->
+      <div v-else class="mt-10 rounded-md border border-nc-rule bg-nc-char p-6 sm:p-8" data-shows-unavailable>
+        <p class="font-display text-2xl font-bold">Show list unavailable right now</p>
+        <p class="mt-2 max-w-xl text-nc-mist">
+          We couldn’t load Nino’s shows from OnTreasure just now. His profile there has the current list.
+        </p>
+        <LinkButton to="ontreasure" variant="outline-light" class="mt-5">Open Nino’s OnTreasure profile</LinkButton>
+      </div>
+
+      <p class="mt-4 text-caption text-nc-mist">
+        Dates and locations come from
+        <a :href="site.onTreasureUrl" target="_blank" rel="noopener noreferrer" class="underline underline-offset-2 hover:text-white">Nino’s OnTreasure profile<span class="sr-only"> (opens in a new tab)</span></a>.
+      </p>
+
+      <!-- At the table -->
+      <div class="mt-12 grid items-center gap-6 border-t border-nc-rule pt-10 md:grid-cols-[minmax(0,22rem)_1fr] md:gap-10">
+        <figure class="relative">
+          <IgImage :photo="table" sizes="(min-width: 768px) 22rem, 100vw" class="aspect-[16/10] w-full rounded-sm object-cover object-[50%_72%]" />
+          <figcaption class="absolute bottom-2 left-2 rounded-md bg-nc-ink/80 px-2.5 py-1 text-caption text-white backdrop-blur-sm">
+            “{{ table.caption }}” · {{ formatPostDate(table.postDate) }}
+          </figcaption>
+        </figure>
+        <div>
+          <p class="text-nc-mist">At the show, look for the black Nino’s Collectibles banner on the table:</p>
           <ul
-            class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-display text-2xl font-bold uppercase"
+            class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-display text-3xl font-bold uppercase"
             aria-label="Banner text: Buy, Sell, Trade, Collect"
           >
             <template v-for="(word, i) in banner" :key="word">
@@ -45,6 +174,5 @@ const banner = ['Buy', 'Sell', 'Trade', 'Collect'] as const
         </div>
       </div>
     </div>
-    <div class="h-12 lg:hidden" aria-hidden="true" />
   </section>
 </template>

@@ -6,6 +6,8 @@
     >
       Skip to content
     </a>
+    <StarField />
+    <div class="relative z-10">
     <SiteHeader />
     <main id="main" tabindex="-1">
       <HeroSection />
@@ -16,5 +18,6 @@
       <ContactSection />
     </main>
     <SiteFooter />
+    </div>
   </div>
 </template>

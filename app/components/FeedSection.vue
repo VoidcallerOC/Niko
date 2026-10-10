@@ -5,7 +5,7 @@ const [feature, ...rest] = feed
 </script>
 
 <template>
-  <section id="feed" aria-labelledby="feed-title" class="bg-nc-coal">
+  <section id="feed" aria-labelledby="feed-title" class="bg-nc-coal/80">
     <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:py-24">
       <!-- Intro + feature image -->
       <div class="grid gap-8 lg:grid-cols-12 lg:items-center lg:gap-10">

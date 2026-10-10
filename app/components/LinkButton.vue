@@ -14,11 +14,12 @@ const props = withDefaults(
   { variant: 'red', size: 'md', block: false, iconOnlyOnPhone: false },
 )
 
+const links = useSiteLinks()
 const href = computed(() =>
   props.to === 'instagram'
-    ? site.instagramUrl
+    ? links.value.instagramUrl
     : props.to === 'ontreasure'
-      ? site.onTreasureUrl
+      ? links.value.onTreasureUrl
       : props.to,
 )
 const external = computed(() => /^https?:/.test(href.value))

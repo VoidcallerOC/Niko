@@ -3,7 +3,12 @@
 A single-page homepage **preview** for [@ninoscollectibles](https://www.instagram.com/ninoscollectibles/).
 Not published or deployed.
 
-**Stack:** Nuxt 4 (Vue 3, TypeScript, Nitro) and Tailwind CSS v4 through `@tailwindcss/vite`. No backend, database or external API.
+**Stack:** Nuxt 4 (Vue 3, TypeScript, Nitro) and Tailwind CSS v4 through `@tailwindcss/vite`.
+
+**Owner admin (preview):** a private area at `/admin` for inventory, scanning, events, Instagram and
+Square controls, and site settings. See [docs/ADMIN.md](docs/ADMIN.md) for what it does, how sign-in
+works, what was reused from other projects, and what still needs Nino's credentials. Run it locally with
+`NUXT_ADMIN_DEMO=1 npm run dev` (password `demo-nino`, labelled sample data only).
 
 ## Run it
 

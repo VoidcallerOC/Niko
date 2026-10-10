@@ -126,7 +126,7 @@ onBeforeUnmount(() => {
     <!-- Official embed host: laid out (so the iframe can measure) but hidden until rendered. -->
     <div
       ref="host"
-      :class="state === 'embedded' ? 'col-span-2 w-full' : 'pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0'"
+      :class="state === 'embedded' ? 'col-span-2 w-full overflow-x-clip' : 'pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0'"
       :aria-hidden="state === 'embedded' ? undefined : 'true'"
     />
 

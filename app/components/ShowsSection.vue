@@ -19,7 +19,35 @@ const { data, refresh } = await useAsyncData<TreasureResult>(
   { default: fallback },
 )
 
-const shows = computed(() => data.value.shows.slice(0, 6))
+// Events Nino added in the admin (published, not past) join the OnTreasure list.
+const { data: siteData } = await useSiteData()
+const links = useSiteLinks()
+const dayLabel = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  return y && m && d ? new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : iso
+}
+const manual = computed(() =>
+  siteData.value.events.map((e) => ({
+    slug: `nc-${e.id}`,
+    url: e.url || links.value.onTreasureUrl,
+    title: e.title,
+    dateLabel: (e.endDate && e.endDate !== e.date ? `${dayLabel(e.date)} – ${dayLabel(e.endDate)}` : dayLabel(e.date)) + (e.hours ? ` · ${e.hours}` : ''),
+    startDate: e.date,
+    endDate: e.endDate || e.date,
+    venue: e.venue,
+    city: e.city,
+    state: e.state,
+    location: [e.venue, [e.city, e.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '),
+    poster: '',
+    posterAlt: '',
+    external: !!e.url,
+  })),
+)
+const shows = computed(() => {
+  const urls = new Set(manual.value.map((s) => s.url))
+  const treasure = data.value.shows.filter((s) => !urls.has(s.url)).map((s) => ({ ...s, external: true }))
+  return [...manual.value, ...treasure].sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0)).slice(0, 6)
+})
 
 // Posters that fail to load (removed, blocked) fall back to the NC mark.
 const brokenPosters = ref(new Set<string>())
@@ -59,7 +87,7 @@ useHead(() => ({
               ...(show.poster ? { image: show.poster } : {}),
               location: {
                 '@type': 'Place',
-                name: show.venue || `${show.city}, ${show.state}`,
+                name: show.venue || [show.city, show.state].filter(Boolean).join(', ') || 'See event page',
                 address: {
                   '@type': 'PostalAddress',
                   addressLocality: show.city,
@@ -148,8 +176,8 @@ useHead(() => ({
       </div>
 
       <p class="mt-4 text-caption text-nc-mist">
-        Dates and locations come from
-        <a :href="site.onTreasureUrl" target="_blank" rel="noopener noreferrer" class="py-3.5 underline underline-offset-2 hover:text-white">Nino’s OnTreasure profile<span class="sr-only"> (opens in a new tab)</span></a>.
+        Dates and locations come from<template v-if="manual.length"> Nino and</template>
+        <a :href="links.onTreasureUrl" target="_blank" rel="noopener noreferrer" class="py-3.5 underline underline-offset-2 hover:text-white">Nino’s OnTreasure profile<span class="sr-only"> (opens in a new tab)</span></a>.
       </p>
 
       <!-- At the table -->

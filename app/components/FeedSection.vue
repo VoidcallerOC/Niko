@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { feed } from '~/data/media'
 
-const [feature, ...rest] = feed
+const { data: siteData } = await useSiteData()
+const visible = computed(() => {
+  const { hidden, featured } = siteData.value.instagram
+  const shown = feed.filter((p) => !hidden.includes(p.id))
+  // Featured posts lead, in the order they were featured; the rest keep feed order.
+  return [...featured.map((id) => shown.find((p) => p.id === id)).filter((p): p is (typeof feed)[number] => !!p), ...shown.filter((p) => !featured.includes(p.id))]
+})
+const feature = computed(() => visible.value[0])
+const rest = computed(() => visible.value.slice(1))
+const copy = computed(() => siteData.value.copy)
 </script>
 
 <template>
@@ -13,8 +22,7 @@ const [feature, ...rest] = feed
           <p class="eyebrow">From the feed</p>
           <h2 id="feed-title" class="mt-3 text-title">Recent pulls, deals and pack rips</h2>
           <p class="mt-4 max-w-md text-nc-mist">
-            A handful of Nino’s Instagram posts, mostly One Piece and Pokémon. These are past posts,
-            not a stock list, so ask Nino what’s available before you count on a card.
+            {{ copy.feedIntro || 'A handful of Nino’s Instagram posts, mostly One Piece and Pokémon. These are past posts, not a stock list, so ask Nino what’s available before you count on a card.' }}
           </p>
           <div class="mt-6 flex flex-col gap-3 sm:flex-row">
             <LinkButton to="instagram" block>Ask about a card</LinkButton>

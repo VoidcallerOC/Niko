@@ -2,6 +2,8 @@
 import { photos } from '~/data/media'
 
 const hero = photos.vendorSolo
+const { data: siteData } = await useSiteData()
+const copy = computed(() => siteData.value.copy)
 </script>
 
 <template>
@@ -28,16 +30,16 @@ const hero = photos.vendorSolo
 
     <div class="wrap relative pb-10 lg:flex lg:min-h-[min(calc(100svh-4rem),46rem)] lg:items-center lg:py-20">
       <div class="-mt-28 sm:-mt-32 lg:mt-0 lg:w-[52%]">
-        <p class="eyebrow text-white/80 before:bg-nc-red">Pokémon &amp; One Piece cards, bought and sold</p>
+        <p class="eyebrow text-white/80 before:bg-nc-red">{{ copy.heroEyebrow || 'Pokémon & One Piece cards, bought and sold' }}</p>
         <h1
           id="hero-title"
           class="mt-3 text-hero font-extrabold uppercase italic [text-shadow:0_2px_24px_rgba(0,0,0,0.45)]"
         >
-          Nothing<br>but <span class="text-nc-red">heat.</span>
+          <template v-if="copy.heroHeadline">{{ copy.heroHeadline }}</template>
+          <template v-else>Nothing<br>but <span class="text-nc-red">heat.</span></template>
         </h1>
         <p class="mt-5 max-w-md text-lede text-white/80">
-          Nino’s Collectibles is Nino’s own trading-card business. He buys and sells cards, rips
-          packs and sets up at card shows.
+          {{ copy.heroIntro || 'Nino’s Collectibles is Nino’s own trading-card business. He buys and sells cards, rips packs and sets up at card shows.' }}
         </p>
         <div class="mt-7 flex flex-col gap-3 sm:flex-row">
           <LinkButton to="instagram" size="lg" block>Message on Instagram</LinkButton>

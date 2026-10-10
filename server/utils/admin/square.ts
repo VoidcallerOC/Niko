@@ -38,6 +38,12 @@ export interface SquareItem {
   priceCents: number | null
   quantity: number | null
   updatedAt: string
+  /** Public storefront facts, used by the homepage feed only. */
+  currency?: string
+  imageUrl?: string | null
+  archived?: boolean
+  soldOut?: boolean
+  atLocation?: boolean
 }
 
 export interface Conflict {
@@ -100,20 +106,40 @@ const demoCatalog: SquareItem[] = [
   { id: 'SAMPLE-SQ-ITEM-9', version: 1, name: 'SAMPLE Gengar VMAX', description: 'Fusion Strike', variationId: 'SAMPLE-SQ-VAR-9', variationVersion: 1, priceCents: 3500, quantity: 2, updatedAt: '2026-10-01T12:00:00Z' },
 ]
 
+/** Is a catalog object sold at this location? (Square's present/absent rules.) */
+const presentAt = (o: { present_at_all_locations?: boolean; present_at_location_ids?: string[]; absent_at_location_ids?: string[] }, locationId: string) =>
+  !locationId || (o.present_at_all_locations !== false ? !(o.absent_at_location_ids ?? []).includes(locationId) : (o.present_at_location_ids ?? []).includes(locationId))
+
 async function fetchCatalog(): Promise<{ items: SquareItem[]; source: 'square' | 'demo' }> {
   if (isDemo()) {
     // Link the first sample card so the conflict flow has something to show.
     const linked = await getProduct('demo000000000001')
     if (linked && !linked.squareId) await putProduct({ ...linked, squareId: 'SAMPLE-SQ-ITEM-1', squareVariationId: 'SAMPLE-SQ-VAR-1' })
-    return { items: demoCatalog.map((i) => ({ ...i })), source: 'demo' }
   }
+  return fetchCatalogItems()
+}
+
+/** Read the catalog (items, their images and stock) without touching local cards. */
+export async function fetchCatalogItems(): Promise<{ items: SquareItem[]; source: 'square' | 'demo' }> {
+  if (isDemo()) return { items: demoCatalog.map((i) => ({ ...i })), source: 'demo' }
+  const { locationId } = await config()
   const items: SquareItem[] = []
+  const images = new Map<string, string>()
+  const imageIds = new Map<string, string>()
+  const tracked = new Set<string>()
   let cursor: string | undefined
   do {
-    const page = await squareFetch<{ objects?: SquareObject[]; cursor?: string }>(`/v2/catalog/list?types=ITEM${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`)
+    const page = await squareFetch<{ objects?: SquareObject[]; cursor?: string }>(`/v2/catalog/list?types=ITEM,IMAGE${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`)
     for (const o of page.objects ?? []) {
-      if (o.type !== 'ITEM' || !o.item_data || o.is_deleted) continue
+      if (o.is_deleted) continue
+      if (o.type === 'IMAGE' && o.image_data?.url) images.set(o.id, o.image_data.url)
+      if (o.type !== 'ITEM' || !o.item_data) continue
       const v = o.item_data.variations?.[0]
+      const vd = v?.item_variation_data
+      const override = vd?.location_overrides?.find((x) => x.location_id === locationId)
+      if (v && (override?.track_inventory ?? vd?.track_inventory)) tracked.add(v.id)
+      const imageId = o.item_data.image_ids?.[0]
+      if (imageId) imageIds.set(o.id, imageId)
       items.push({
         id: o.id,
         version: o.version ?? 0,
@@ -121,14 +147,19 @@ async function fetchCatalog(): Promise<{ items: SquareItem[]; source: 'square' |
         description: o.item_data.description_plaintext ?? o.item_data.description ?? '',
         variationId: v?.id ?? null,
         variationVersion: v?.version ?? null,
-        priceCents: typeof v?.item_variation_data?.price_money?.amount === 'number' ? v.item_variation_data.price_money.amount : null,
+        priceCents: typeof vd?.price_money?.amount === 'number' ? vd.price_money.amount : null,
         quantity: null,
         updatedAt: o.updated_at ?? '',
+        currency: vd?.price_money?.currency ?? 'USD',
+        imageUrl: null,
+        archived: o.item_data.is_archived === true,
+        soldOut: override?.sold_out === true,
+        atLocation: presentAt(o, locationId) && (!v || presentAt(v, locationId)),
       })
     }
     cursor = page.cursor
   } while (cursor)
-  const { locationId } = await config()
+  for (const item of items) item.imageUrl = images.get(imageIds.get(item.id) ?? '') ?? null
   const variationIds = items.map((i) => i.variationId).filter((x): x is string => !!x)
   if (locationId && variationIds.length) {
     for (let i = 0; i < variationIds.length; i += 100) {
@@ -142,21 +173,40 @@ async function fetchCatalog(): Promise<{ items: SquareItem[]; source: 'square' |
         if (item) item.quantity = Number(c.quantity ?? 0)
       }
     }
+    // Tracked with no in-stock count at this location means none on hand.
+    for (const item of items) if (item.quantity === null && item.variationId && tracked.has(item.variationId)) item.quantity = 0
   }
   return { items, source: 'square' }
 }
 
-interface SquareObject {
+interface Presence {
+  present_at_all_locations?: boolean
+  present_at_location_ids?: string[]
+  absent_at_location_ids?: string[]
+}
+
+interface SquareObject extends Presence {
   type: string
   id: string
   version?: number
   is_deleted?: boolean
   updated_at?: string
+  image_data?: { url?: string }
   item_data?: {
     name?: string
     description?: string
     description_plaintext?: string
-    variations?: Array<{ id: string; version?: number; item_variation_data?: { price_money?: { amount?: number; currency?: string } } }>
+    is_archived?: boolean
+    image_ids?: string[]
+    variations?: Array<Presence & {
+      id: string
+      version?: number
+      item_variation_data?: {
+        price_money?: { amount?: number; currency?: string }
+        track_inventory?: boolean
+        location_overrides?: Array<{ location_id?: string; track_inventory?: boolean; sold_out?: boolean }>
+      }
+    }>
   }
 }
 

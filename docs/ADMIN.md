@@ -157,10 +157,12 @@ Photos are resized on the phone (1600 px, JPEG) before upload and capped at 4 MB
 - **Environment.** `NUXT_SQUARE_ENV` must be `production` or `sandbox`; there is no default. Connections and merchant links are tagged with their environment. The test-only host overrides (`NUXT_SQUARE_API_ORIGIN`, `NUXT_SQUARE_AUTHORIZE_URL`) are ignored on Vercel.
 - **Sync** (preview, per-field conflicts, confirm before apply, no deletes, no duplicates) runs only on that OAuth connection through the official Catalog and Inventory APIs.
 - **Demo mode** uses a labelled SAMPLE Square account and catalog and makes no network calls to Square.
+- **Homepage feed.** Once Square is connected, the homepage "From the feed" section (`#feed`, linked from the hero) lists Nino's Square items, newest first, through `/api/feed`. Shown: named, unarchived items sold at the connected location that aren't marked sold out and are in stock (or don't track stock). Name, description, price, stock count and the first item image come straight from Square; an item with no price shows "Ask". Square ids and tokens never leave the server. One Square read is shared by all visitors for 5 minutes (stored as `public:feed`). If Square errors, the last good read is shown for up to a day. With no connection, or nothing in stock, the section shows the Instagram posts as before; with stock, the latest five Instagram posts sit below it.
+- Tracked items with no in-stock count at the connected location now read as quantity 0 (previously "unknown"), in sync previews as well.
 
 ## Instagram
 
-- The site feed is a manual import of public posts (`app/data/media.ts`, imported 2026-10-10). The admin shows exactly that: source, import date, "live sync: not set up". No password is requested, no cookies are stored, nothing claims to be current.
+- The Instagram posts are a manual import of public posts (`app/data/media.ts`, imported 2026-10-10). The admin shows exactly that: source, import date, "live sync: not set up". No password is requested, no cookies are stored, nothing claims to be current.
 - Feature/hide controls act on the imported posts and update the homepage.
 - A live feed needs the Instagram Graph API on a Meta app Nino approves, with the token kept in server env. Not built.
 

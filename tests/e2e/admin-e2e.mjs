@@ -187,6 +187,12 @@ await req(B, nino, '/api/admin/settings', { method: 'PUT', body: { copy: { heroH
 const early = await squareTrip(B, new Jar(), '/api/admin/auth/square/start')
 ok('Sign in with Square before connecting: refused', early.stage === 'start' && early.location?.includes('error=nosquare'), early.location)
 
+// Homepage feed before Square is connected: empty, so the site shows Instagram
+const feed0 = await req(B, null, '/api/feed')
+ok('Homepage feed is empty before Square is connected', feed0.status === 200 && feed0.data?.source === null && feed0.data?.cards?.length === 0, feed0.text.slice(0, 120))
+const home0 = await req(B, null, '/')
+ok('Homepage feed falls back to Instagram before Square is connected', home0.text.includes('data-feed-source="instagram"'))
+
 // Square: connect from the admin
 await mock('/__mock/merchant', { merchant: 'M-NINO' })
 const conn = await squareTrip(B, nino, '/api/admin/auth/square/start?next=/admin/square')
@@ -202,6 +208,17 @@ const allKeys = redis('--scan', '--pattern', 'ninos:admin:*').split('\n')
 ok('Session-sealing key is not stored in Redis when NUXT_SESSION_SECRET is set', !allKeys.includes('ninos:admin:session:secret'))
 const prev = await req(B, nino, '/api/admin/square/preview', { method: 'POST' })
 ok('Square preview reads the real (mock) catalog through the connection', prev.status === 200 && prev.data?.source === 'square' && prev.data?.imports?.[0]?.name === 'Mock Square card', `${prev.status} ${prev.data?.source}`)
+
+// Homepage feed reads the connected catalog: in-stock cards only, no ids or tokens
+const feed1 = await req(B, null, '/api/feed')
+const names1 = (feed1.data?.cards ?? []).map((c) => c.name)
+ok('Homepage feed lists in-stock Square items, newest first', feed1.data?.source === 'square' && names1.join('|') === 'Mock untracked card|Mock Square card', names1.join('|'))
+const card1 = feed1.data?.cards?.find((c) => c.name === 'Mock Square card')
+ok('Homepage feed carries price, stock and image from Square', card1?.priceCents === 2500 && card1?.quantity === 4 && card1?.imageUrl === 'https://example.com/mock-square-card.jpg')
+ok('Homepage feed shows no price where Square has none', feed1.data?.cards?.find((c) => c.name === 'Mock untracked card')?.priceCents === null)
+ok('Homepage feed sends no Square ids or tokens', !/SQ-(ITEM|VAR|IMG)|mock-access-token|RT-|sealed|L-NINO|M-NINO/.test(feed1.text), feed1.text.slice(0, 200))
+const home1 = await req(B, null, '/')
+ok('Homepage renders the Square stock in the feed section', home1.text.includes('data-feed-source="square"') && home1.text.includes('Mock Square card') && !home1.text.includes('Mock sold-out card'))
 
 // Square sign-in for the linked merchant
 const viaSquare = new Jar()
@@ -228,6 +245,8 @@ ok('Disconnect revokes access at Square', disc.data?.revoked === true && !afterD
 ok('Disconnect deletes the stored connection', redis('exists', 'ninos:admin:square:connection') === '0')
 const st2 = await req(B, nino, '/api/admin/square/status')
 ok('Square status shows not connected', st2.data?.connection === null && st2.data?.canConnect === true)
+const feed2 = await req(B, null, '/api/feed')
+ok('After disconnect, the homepage feed stops showing Square stock', feed2.data?.source === null && feed2.data?.cards?.length === 0)
 const afterDiscSignin = await squareTrip(B, new Jar(), '/api/admin/auth/square/start')
 ok('After disconnect, Sign in with Square is refused', afterDiscSignin.location?.includes('error=nosquare'), afterDiscSignin.location)
 ok('After disconnect, email + password still works', (await req(B, new Jar(), '/api/admin/auth/login', { method: 'POST', body: { email: 'nino@example.com', password: good.password } })).status === 200)

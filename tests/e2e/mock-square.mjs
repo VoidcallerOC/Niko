@@ -58,8 +58,17 @@ http.createServer(async (req, res) => {
   if (p === '/v2/team-members/search') return json(res, 200, { team_members: [{ is_owner: true, email_address: info.email, status: 'ACTIVE' }] })
   if (p === '/v2/locations') return json(res, 200, { locations: [{ id: info.location.id, name: info.location.name, status: 'ACTIVE' }] })
   if (p === '/v2/catalog/list') {
-    log.push({ t: 'catalog', merchant: m })
-    return json(res, 200, { objects: [{ type: 'ITEM', id: 'SQ-ITEM-1', version: 3, updated_at: '2026-10-01T00:00:00Z', item_data: { name: 'Mock Square card', description_plaintext: 'From the mock catalog', variations: [{ id: 'SQ-VAR-1', version: 3, item_variation_data: { price_money: { amount: 2500, currency: 'USD' } } }] } }] })
+    log.push({ t: 'catalog', merchant: m, types: url.searchParams.get('types') })
+    const v = (id, extra = {}) => ({ id, version: 3, item_variation_data: { track_inventory: true, ...extra } })
+    const objects = [
+      { type: 'ITEM', id: 'SQ-ITEM-1', version: 3, updated_at: '2026-10-01T00:00:00Z', item_data: { name: 'Mock Square card', description_plaintext: 'From the mock catalog', image_ids: ['SQ-IMG-1'], variations: [v('SQ-VAR-1', { price_money: { amount: 2500, currency: 'USD' } })] } },
+      { type: 'ITEM', id: 'SQ-ITEM-2', version: 1, updated_at: '2026-10-02T00:00:00Z', item_data: { name: 'Mock sold-out card', variations: [v('SQ-VAR-2', { price_money: { amount: 900, currency: 'USD' } })] } },
+      { type: 'ITEM', id: 'SQ-ITEM-3', version: 1, updated_at: '2026-10-02T00:00:00Z', item_data: { name: 'Mock archived card', is_archived: true, variations: [v('SQ-VAR-3', { price_money: { amount: 900, currency: 'USD' }, track_inventory: false })] } },
+      { type: 'ITEM', id: 'SQ-ITEM-4', version: 1, updated_at: '2026-10-03T00:00:00Z', item_data: { name: 'Mock untracked card', variations: [v('SQ-VAR-4', { track_inventory: false })] } },
+      { type: 'ITEM', id: 'SQ-ITEM-5', version: 1, updated_at: '2026-10-04T00:00:00Z', present_at_all_locations: false, present_at_location_ids: ['L-ELSEWHERE'], item_data: { name: 'Mock other-location card', variations: [v('SQ-VAR-5', { price_money: { amount: 900, currency: 'USD' } })] } },
+    ]
+    if ((url.searchParams.get('types') || '').split(',').includes('IMAGE')) objects.push({ type: 'IMAGE', id: 'SQ-IMG-1', image_data: { url: 'https://example.com/mock-square-card.jpg' } })
+    return json(res, 200, { objects })
   }
   if (p === '/v2/inventory/counts/batch-retrieve') return json(res, 200, { counts: [{ catalog_object_id: 'SQ-VAR-1', quantity: '4', state: 'IN_STOCK' }] })
   json(res, 404, { errors: [{ code: 'NOT_FOUND', detail: p }] })

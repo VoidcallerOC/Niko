@@ -24,3 +24,15 @@ export function useSiteLinks() {
     onTreasureUrl: data.value?.copy.onTreasureUrl || 'https://www.ontreasure.com/u/ninoscollectibles',
   }))
 }
+
+/** In-stock cards from Nino's Square catalog (/api/feed); empty until Square is connected. */
+export interface SquareFeed {
+  source: 'square' | 'demo' | null
+  fetchedAt: string | null
+  cards: Array<{ key: string; name: string; description: string; priceCents: number | null; currency: string; quantity: number | null; imageUrl: string | null }>
+}
+
+export function useSquareFeed() {
+  const none = (): SquareFeed => ({ source: null, fetchedAt: null, cards: [] })
+  return useAsyncData<SquareFeed>('square-feed', () => $fetch<SquareFeed>('/api/feed' as string).catch(() => none()), { default: none })
+}

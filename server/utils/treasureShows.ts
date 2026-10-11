@@ -7,7 +7,8 @@
  *   1. GET the public profile page and read the vendor's user object out of
  *      the Next.js flight payload.
  *   2. POST OnTreasure's own "getUserEventsDisplayData" server action for the
- *      Vending tab, which returns the event objects the profile page renders.
+ *      Vending tab ({ page, filter: 'Vending', upcoming: true, userId }, six
+ *      events a page), which returns the event objects the profile page renders.
  *   3. If the stored action id has rotated, find the current one in
  *      OnTreasure's JS chunks and retry once.
  *   4. Parse, drop anything whose last day is before today (America/New_York),
@@ -46,9 +47,12 @@ export interface TreasureResult {
   fetchedAt: string
 }
 
-// Current id of OnTreasure's getUserEventsDisplayData action (from Thousand
-// Sunny, Oct 2026). `findAction` replaces it at runtime if it has rotated.
-let actionId = '7ee3f21cc8faf356c52c7141510f47fd62e88b4336'
+// Current id of OnTreasure's getUserEventsDisplayData action (read from
+// OnTreasure's JS, 2026-10-11). `findAction` replaces it at runtime if it has rotated.
+let actionId = '407e5caea3ee6a16d8f7daafe00262f2f560783759'
+/** OnTreasure returns this many events per page of the Vending tab. */
+const PAGE_SIZE = 6
+const MAX_PAGES = 5
 
 const FRESH_MS = 5 * 60 * 1000
 let cache: { at: number; result: TreasureResult } | null = null
@@ -103,6 +107,20 @@ export function extractUser(html: string): Record<string, string> {
   return obj
 }
 
+/**
+ * The action id declared for getUserEventsDisplayData in one of OnTreasure's JS
+ * chunks, or null. Ids are hex and currently 42 characters, so match the whole
+ * run rather than a fixed length.
+ */
+export function actionIdFrom(chunk: string): string | null {
+  const declared = chunk.match(/createServerReference\)?\(\s*"([a-f0-9]{40,})"[^)]*?"getUserEventsDisplayData"/)
+  if (declared) return declared[1]!
+  const at = chunk.indexOf('getUserEventsDisplayData')
+  if (at < 0) return null
+  const ids = chunk.slice(Math.max(0, at - 500), at).match(/[a-f0-9]{40,}/g)
+  return ids?.length ? ids[ids.length - 1]! : null
+}
+
 async function findAction(html: string): Promise<string> {
   const srcs = [...new Set([...html.matchAll(/\/_next\/static\/chunks\/[^"'\\\s>]+\.js/g)].map((m) => m[0]))]
   for (let i = 0; i < srcs.length; i += 6) {
@@ -114,10 +132,8 @@ async function findAction(html: string): Promise<string> {
       }),
     )
     for (const text of texts) {
-      const at = text.indexOf('getUserEventsDisplayData')
-      if (at < 0) continue
-      const ids = text.slice(Math.max(0, at - 500), at).match(/[a-f0-9]{40}/g)
-      if (ids?.length) return ids[ids.length - 1]!
+      const id = actionIdFrom(text)
+      if (id) return id
     }
   }
   throw new Error('OnTreasure show feed is not available')
@@ -198,7 +214,14 @@ export function readEvents(payload: string, today = easternToday()): TreasureSho
   return shows
 }
 
-async function postEvents(user: Record<string, string>, action: string) {
+/** The request body OnTreasure's own profile page sends for one page of the Vending tab. */
+export function eventsRequestBody(userId: string, page: number): string {
+  return JSON.stringify([
+    { page, filter: 'Vending', upcoming: true, userId, from: '$undefined', until: '$undefined' },
+  ])
+}
+
+async function postEvents(userId: string, action: string, page: number) {
   return fetch(`${TREASURE_PROFILE}?tab=events`, {
     method: 'POST',
     headers: {
@@ -206,24 +229,40 @@ async function postEvents(user: Record<string, string>, action: string) {
       'content-type': 'text/plain;charset=UTF-8',
       'next-action': action,
     },
-    body: JSON.stringify([1, 'Vending', true, user, '$undefined', '$undefined']),
+    body: eventsRequestBody(userId, page),
   })
 }
 
-async function fetchShows(): Promise<TreasureShow[]> {
-  const page = await fetch(TREASURE_PROFILE, { headers: { accept: 'text/html' } })
-  if (!page.ok) throw new Error(`OnTreasure ${page.status}`)
-  const html = await page.text()
-  const user = extractUser(html)
-  let res = await postEvents(user, actionId)
+/** A successful action reply: a flight payload whose result row is an array (possibly empty). */
+function isEventsReply(body: string): boolean {
+  return /^1:\[/m.test(body)
+}
+
+async function fetchPage(html: string, userId: string, page: number): Promise<string> {
+  let res = await postEvents(userId, actionId, page)
   let body = await res.text()
-  if (!res.ok || !body.includes('"cleaned_name"')) {
+  if (!res.ok || !isEventsReply(body)) {
+    // Usually 404 "Server action not found": the id rotated with a deploy.
     actionId = await findAction(html)
-    res = await postEvents(user, actionId)
+    res = await postEvents(userId, actionId, page)
     body = await res.text()
-    if (!res.ok || !body.includes('"cleaned_name"')) throw new Error('OnTreasure events did not load')
+    if (!res.ok || !isEventsReply(body)) throw new Error('OnTreasure events did not load')
   }
-  return readEvents(body)
+  return body
+}
+
+async function fetchShows(): Promise<TreasureShow[]> {
+  const profile = await fetch(TREASURE_PROFILE, { headers: { accept: 'text/html' } })
+  if (!profile.ok) throw new Error(`OnTreasure ${profile.status}`)
+  const html = await profile.text()
+  const user = extractUser(html)
+  let all = ''
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const body = await fetchPage(html, user.id!, page)
+    all += body
+    if ((body.match(/"cleaned_name":"/g)?.length ?? 0) < PAGE_SIZE) break
+  }
+  return readEvents(all)
 }
 
 export async function loadTreasureShows(): Promise<TreasureResult> {

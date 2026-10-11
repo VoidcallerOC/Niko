@@ -12,6 +12,7 @@ import { createScanSession, SCAN_STATE, SCAN_ERROR } from '~/lib/scanner/scan-se
 import { MATCH_STATUS } from '~/lib/scanner/catalog-matcher.js'
 import { gameLabel } from '~/lib/scanner/game-patterns.js'
 import { bestSearchQuery, correctClues } from '~/lib/scanner/card-identifier.js'
+import { formatMoney } from '~/lib/pricing/money.js'
 import type { ScanCard } from '~/composables/useCardSearch'
 
 const props = defineProps<{ open: boolean; selectedGame: string; search: (q: string, game: string) => Promise<ScanCard[]> }>()
@@ -23,8 +24,22 @@ interface Clues {
   corrected?: boolean
 }
 interface Candidate {
-  card: ScanCard
+  card: ScanCard & { provider_card_id?: string }
   game: string
+  numberMatch?: boolean
+  numberConflict?: boolean
+  nameConflict?: boolean
+  readNumbers?: string[]
+}
+interface Match {
+  status: string
+  candidates: Candidate[]
+  reason?: string
+  leader?: boolean
+  needsNumber?: boolean
+  checkNumber?: boolean
+  numberOnly?: boolean
+  moreCards?: number
 }
 interface ScanState {
   status: string
@@ -32,7 +47,7 @@ interface ScanState {
   code?: string
   message?: string
   clues?: Clues
-  match?: { status: string; candidates: Candidate[]; reason?: string } | null
+  match?: Match | null
 }
 
 const ERRORS: Record<string, [string, string, boolean]> = {
@@ -125,7 +140,66 @@ const readLine = computed(() => {
 })
 const error = computed(() => (state.value.status === SCAN_STATE.ERROR ? (ERRORS[state.value.code ?? ''] ?? ERRORS[SCAN_ERROR.FAILED]) : null))
 const showFix = computed(() => state.value.status === SCAN_STATE.RESULT || (state.value.code === SCAN_ERROR.SEARCH_FAILED && !!state.value.clues))
-const fixOpenByDefault = computed(() => state.value.status === SCAN_STATE.RESULT && state.value.match?.status === MATCH_STATUS.NOT_IDENTIFIED)
+const fixOpenByDefault = computed(() => {
+  const match = state.value.status === SCAN_STATE.RESULT ? state.value.match : null
+  return match?.status === MATCH_STATUS.NOT_IDENTIFIED || (match?.status === MATCH_STATUS.NEEDS_CONFIRMATION && (match.needsNumber === true || match.checkNumber === true))
+})
+
+// Needs-confirmation screen. Only a card whose evidence beats the rest is
+// highlighted, and all of its printings equally: the scan says which card,
+// never which printing (1st Edition and Unlimited can differ several-fold).
+const cardOf = (item: Candidate) => item.card.provider_card_id ?? item.card.id
+const confirm = computed(() => {
+  const match = state.value.match
+  if (state.value.status !== SCAN_STATE.RESULT || match?.status !== MATCH_STATUS.NEEDS_CONFIRMATION) return null
+  const clues = state.value.clues
+  const lead = match.leader === true && match.candidates[0] ? cardOf(match.candidates[0]) : null
+  const readNumbers = (clues?.identifiers ?? []).filter((item) => item.query).map((item) => item.raw ?? item.query)
+  const cardCount = new Set(match.candidates.map(cardOf)).size
+  // Printings that share the number read (alternate art, manga, SP, reprints…)
+  // print the same name and number, so the text read cannot choose between
+  // them, yet their values can differ several hundredfold. Say so, with the
+  // range, instead of implying a pick.
+  const numbered = match.candidates.filter((item) => item.numberMatch && !item.nameConflict)
+  const printings = new Set(numbered.map(cardOf)).size
+  const printingChoice = !match.leader && printings > 1
+  const nm = numbered.map((item) => item.card.pricing?.NM?.reference_cents).filter((cents): cents is number => Number.isSafeInteger(cents))
+  const unpriced = numbered.length - nm.length
+  const valueRange = nm.length > 1 && Math.max(...nm) > Math.min(...nm) ? `their Near Mint market references range from ${formatMoney(Math.min(...nm))} to ${formatMoney(Math.max(...nm))}` : 'they can differ in value'
+  const numbers = readNumbers.join(', ')
+  const title = match.checkNumber
+    ? 'The name and number we read point to different cards.'
+    : match.needsNumber
+      ? 'Several cards match the name. Which one is yours?'
+      : printingChoice
+        ? `${printings} printings share this number. Which one is yours?`
+        : match.candidates.length > 1
+          ? 'Which card is in your hand?'
+          : 'Is this your card?'
+  const notes = [
+    printingChoice ? `They print the same name and number but differ in artwork, and ${valueRange}${unpriced ? ` (${unpriced} with no online price)` : ''}. Compare the artwork, set and label (e.g. Alternate Art, Manga, SP) with your card. The shop checks the printing in person.` : '',
+    match.checkNumber
+      ? clues?.corrected
+        ? `Check the name and number (${numbers}) printed on your card and correct them below.`
+        : `We may have misread the number (${numbers}). Check the name and number printed on your card and correct them below if they differ.`
+      : match.needsNumber
+        ? readNumbers.length
+          ? `The number we read (${numbers}) doesn't match any of these cards. Check the number printed at the bottom of your card and type it below, or compare the set and number of each match.`
+          : "We read the name but not the card number, so we can't tell which set your card is from. Type the number printed at the bottom of your card (e.g. 43/64) below, or compare the set and number of each match."
+        : match.numberOnly && !clues?.corrected
+          ? `Matched only by the number we read (${numbers}); we could not read the name. Check that the name and number match your card.`
+          : '',
+  ].filter(Boolean)
+  const more = (match.moreCards ?? 0) > 0 ? (numbered.length ? `${match.moreCards} more cards with a different number are not shown.` : `Showing ${cardCount} matching cards; ${match.moreCards} more match. Add the card number to narrow it down.`) : ''
+  return { lead, title, notes, more }
+})
+const isLead = (item: Candidate, index: number) => (confirm.value ? confirm.value.lead !== null && cardOf(item) === confirm.value.lead : index === 0)
+function conflicts(item: Candidate) {
+  return [
+    item.numberConflict ? `Number on this card: ${item.card.card_number}. Read from your card: ${(item.readNumbers ?? []).join(', ')}.` : '',
+    item.nameConflict ? "Only the number matches: the name read from your card is not this card's name." : '',
+  ].filter(Boolean)
+}
 
 function candidateLine(card: ScanCard) {
   return [card.set_name, card.card_number, card.printing, card.language && card.language !== 'English' ? card.language : null].filter(Boolean).join(' · ') || 'Set not listed'
@@ -215,17 +289,22 @@ function onKeydown(event: KeyboardEvent) {
       <template v-else-if="state.status === SCAN_STATE.RESULT && state.match">
         <template v-if="state.match.status !== MATCH_STATUS.NOT_IDENTIFIED">
           <p class="text-caption font-semibold tracking-wide text-nc-red-bright uppercase">{{ state.match.status === MATCH_STATUS.IDENTIFIED ? 'Card found' : 'Needs confirmation' }}</p>
-          <p v-if="state.match.status === MATCH_STATUS.NEEDS_CONFIRMATION" class="mb-2 font-display text-2xl font-bold">{{ state.match.candidates.length > 1 ? 'Which card is in your hand?' : 'Is this your card?' }}</p>
+          <template v-if="confirm">
+            <p class="mb-2 font-display text-2xl font-bold">{{ confirm.title }}</p>
+            <p v-for="note in confirm.notes" :key="note" class="mb-2 text-sm text-nc-mist">{{ note }}</p>
+          </template>
           <ul class="mt-2 grid gap-2" role="list">
-            <li v-for="(item, index) in state.match.candidates" :key="item.card.id" class="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between" :class="index === 0 ? 'border-nc-red bg-nc-char' : 'border-white/15'" data-scan-candidate>
+            <li v-for="(item, index) in state.match.candidates" :key="item.card.id" class="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between" :class="isLead(item, index) ? 'border-nc-red bg-nc-char' : 'border-white/15'" data-scan-candidate>
               <div class="min-w-0">
                 <strong class="block text-lg break-words">{{ item.card.name }}</strong>
                 <span class="block text-sm break-words text-nc-mist">{{ candidateLine(item.card) }}</span>
                 <small class="block text-xs text-white/50">{{ [gameLabel(item.game), item.card.rarity].filter(Boolean).join(' · ') }}</small>
+                <small v-for="line in conflicts(item)" :key="line" class="block text-xs text-white/50">{{ line }}</small>
               </div>
-              <AdminButton :variant="index === 0 ? 'red' : 'white'" size="sm" @click="emit('confirm', item.card)">Use this card</AdminButton>
+              <AdminButton :variant="isLead(item, index) ? 'red' : 'white'" size="sm" @click="emit('confirm', item.card)">Use this card</AdminButton>
             </li>
           </ul>
+          <p v-if="confirm?.more" class="mt-3 text-sm text-nc-mist">{{ confirm.more }}</p>
           <p class="mt-3 text-sm text-nc-mist">Catalog match from the text on the card. Check the set and printing (foil, edition) yourself; condition is never judged from the photo.</p>
         </template>
         <template v-else>

@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { extractUser, readEvents, easternToday } from '../server/utils/treasureShows.ts'
+import { extractUser, readEvents, easternToday, actionIdFrom, eventsRequestBody } from '../server/utils/treasureShows.ts'
 
 const fixture = new URL('./fixtures/ontreasure-profile.html', import.meta.url)
 
@@ -69,4 +69,19 @@ test('easternToday is an ISO date', () => {
   assert.match(easternToday(new Date('2026-10-10T03:30:00Z')), /^\d{4}-\d{2}-\d{2}$/)
   // 03:30 UTC on Oct 10 is still Oct 9 in New York
   assert.equal(easternToday(new Date('2026-10-10T03:30:00Z')), '2026-10-09')
+})
+
+// Snippet of OnTreasure's own chunk (2026-10-11): the id is 42 hex characters.
+const chunk =
+  'e.i(95187);let o=(0,s.createServerReference)("407e5caea3ee6a16d8f7daafe00262f2f560783759",s.callServer,void 0,s.findSourceMapURL,"getUserEventsDisplayData"),u=["Attending","Hosting","Vending","Liked"];'
+
+test('actionIdFrom reads the whole action id, not a 40-character prefix', () => {
+  assert.equal(actionIdFrom(chunk), '407e5caea3ee6a16d8f7daafe00262f2f560783759')
+  assert.equal(actionIdFrom('no action here'), null)
+})
+
+test('eventsRequestBody sends the object OnTreasure\'s profile page sends for the Vending tab', () => {
+  assert.deepEqual(JSON.parse(eventsRequestBody('user-1', 2)), [
+    { page: 2, filter: 'Vending', upcoming: true, userId: 'user-1', from: '$undefined', until: '$undefined' },
+  ])
 })

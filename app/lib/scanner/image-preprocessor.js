@@ -1,4 +1,4 @@
-// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@e46d63f). Keep in sync by copying.
+// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@a9c59fa). Keep in sync by copying.
 // ImagePreprocessor: prepares a captured card for OCR. Produces a full-card
 // image (names, Yu-Gi-Oh! set codes) and an enlarged bottom strip, where most
 // games print the collector number in small type.

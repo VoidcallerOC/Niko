@@ -1,4 +1,4 @@
-// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@e46d63f). Keep in sync by copying.
+// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@a9c59fa). Keep in sync by copying.
 // OCR engine boundary. The shipped engine is Tesseract.js, self-hosted under
 // public/scanner/tesseract and run in a Web Worker inside the browser:
 // captured images are never uploaded. Any other engine (e.g. a server-side vision service) only
@@ -83,12 +83,19 @@ export function createTesseractEngine({ base = VENDOR, onProgress } = {}) {
         RECOGNIZE_TIMEOUT_MS,
         "OCR",
       );
+      const height = Number(image?.height) || 0;
       const lines = (data.blocks ?? [])
         .flatMap((block) => block.paragraphs ?? [])
         .flatMap((paragraph) => paragraph.lines ?? [])
         .map((line) => ({
           text: String(line.text ?? "").trim(),
           confidence: Number(line.confidence) || 0,
+          // Vertical position (0 = top of the image): card names are printed
+          // near the top, attack names and rules text further down.
+          top:
+            height && Number.isFinite(line.bbox?.y0)
+              ? line.bbox.y0 / height
+              : null,
         }))
         .filter((line) => line.text);
       return {

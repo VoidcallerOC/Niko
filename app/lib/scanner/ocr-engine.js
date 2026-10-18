@@ -1,4 +1,4 @@
-// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@a9c59fa). Keep in sync by copying.
+// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@f189435). Keep in sync by copying.
 // OCR engine boundary. The shipped engine is Tesseract.js, self-hosted under
 // public/scanner/tesseract and run in a Web Worker inside the browser:
 // captured images are never uploaded. Any other engine (e.g. a server-side vision service) only

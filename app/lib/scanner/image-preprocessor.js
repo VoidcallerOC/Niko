@@ -1,4 +1,4 @@
-// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@a9c59fa). Keep in sync by copying.
+// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@f189435). Keep in sync by copying.
 // ImagePreprocessor: prepares a captured card for OCR. Produces a full-card
 // image (names, Yu-Gi-Oh! set codes) and an enlarged bottom strip, where most
 // games print the collector number in small type.
@@ -91,6 +91,19 @@ export function preprocessCard(canvas, doc = globalThis.document) {
         canvas,
         { x: 0.45, y: 0.84, width: 0.55, height: 0.16 },
         1600,
+        doc,
+      ),
+    },
+    // One Piece (especially full-bleed parallels) prints OP##-### in a tiny
+    // bottom-right corner under the name banner. A tighter, more enlarged
+    // crop gives Tesseract a better chance when the wide strip only reads
+    // the name / type line.
+    {
+      region: "bottom",
+      image: renderRegion(
+        canvas,
+        { x: 0.58, y: 0.9, width: 0.42, height: 0.1 },
+        2000,
         doc,
       ),
     },

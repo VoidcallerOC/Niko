@@ -1,4 +1,4 @@
-// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@a9c59fa). Keep in sync by copying.
+// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@f189435). Keep in sync by copying.
 // ScanSession: CameraCapture → ImagePreprocessor → OCR → CardIdentifier →
 // CatalogMatcher, as a DOM-free state machine. The UI renders each state; the
 // confirmed card is handed back to the existing calculator by the caller.
@@ -214,7 +214,11 @@ export function createScanSession({
       const clues = {
         ...correctClues(
           previous.clues,
-          { name: card?.name, number: card?.number },
+          {
+            name: card?.name,
+            number: card?.number,
+            setName: card?.set_name,
+          },
           card?.game || selectedGame(),
         ),
         corrected: false,

@@ -1,4 +1,4 @@
-// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@a9c59fa). Keep in sync by copying.
+// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@f189435). Keep in sync by copying.
 // CameraCapture: browser camera access and frame capture. The browser owns the
 // permission prompt; we only ask after the customer taps "Scan a card".
 

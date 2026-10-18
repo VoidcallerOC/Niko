@@ -1,4 +1,4 @@
-// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@a9c59fa). Keep in sync by copying.
+// Forked from tcg-buy-calculator (VoidcallerOC/tcg-buy-calculator@f189435). Keep in sync by copying.
 // Printed identifiers per game. Add a game by adding an entry; the camera,
 // OCR and matching code do not change. `game` values match the calculator's
 // game select (provider game ids).
@@ -36,6 +36,18 @@ export const GAME_PATTERNS = [
       {
         regex:
           /(?<![A-Za-z0-9])[O0o©Q]?[PpRr]([A-Za-z0-9]{2,3})\s?-\s?([0-9OoIil]{3})/g,
+        toQuery: (m) => setCode("OP", m[1], m[2]),
+      },
+      // Phone OCR on foil/parallel corners often inserts junk between the
+      // prefix and the set ("OPO TY 02-030", "OP 02 - 030", "0P02—030").
+      {
+        regex:
+          /(?<![A-Za-z0-9])[O0o©Q]?[PpRr]\W{0,3}([A-Za-z0-9]{2,3})\W{0,3}[\-—–]\W{0,3}([0-9OoIil]{3})/g,
+        toQuery: (m) => setCode("OP", m[1], m[2]),
+      },
+      {
+        regex:
+          /(?<![A-Za-z0-9])[O0o©Q]?[PpRr][^0-9]{0,6}(\d{2})\W{0,3}[\-—–]\W{0,3}([0-9OoIil]{3})/g,
         toQuery: (m) => setCode("OP", m[1], m[2]),
       },
       {

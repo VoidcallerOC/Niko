@@ -9,7 +9,7 @@ import { CameraCapture } from '~/lib/scanner/camera-capture.js'
 import { preprocessCard } from '~/lib/scanner/image-preprocessor.js'
 import { createTesseractEngine } from '~/lib/scanner/ocr-engine.js'
 import { createScanSession, SCAN_STATE, SCAN_ERROR } from '~/lib/scanner/scan-session.js'
-import { MATCH_STATUS } from '~/lib/scanner/catalog-matcher.js'
+import { MATCH_STATUS, printedName, variantLabels } from '~/lib/scanner/catalog-matcher.js'
 import { gameLabel } from '~/lib/scanner/game-patterns.js'
 import { bestSearchQuery, correctClues } from '~/lib/scanner/card-identifier.js'
 import { formatMoney } from '~/lib/pricing/money.js'
@@ -40,6 +40,8 @@ interface Match {
   checkNumber?: boolean
   numberOnly?: boolean
   moreCards?: number
+  setChoice?: boolean
+  setCount?: number
 }
 interface ScanState {
   status: string
@@ -142,7 +144,8 @@ const error = computed(() => (state.value.status === SCAN_STATE.ERROR ? (ERRORS[
 const showFix = computed(() => state.value.status === SCAN_STATE.RESULT || (state.value.code === SCAN_ERROR.SEARCH_FAILED && !!state.value.clues))
 const fixOpenByDefault = computed(() => {
   const match = state.value.status === SCAN_STATE.RESULT ? state.value.match : null
-  return match?.status === MATCH_STATUS.NOT_IDENTIFIED || (match?.status === MATCH_STATUS.NEEDS_CONFIRMATION && (match.needsNumber === true || match.checkNumber === true))
+  if (match?.status === MATCH_STATUS.NOT_IDENTIFIED) return true
+  return match?.status === MATCH_STATUS.NEEDS_CONFIRMATION && (match.needsNumber === true || match.checkNumber === true || confirm.value?.askForNumber === true)
 })
 
 // Needs-confirmation screen. Only a card whose evidence beats the rest is
@@ -154,6 +157,9 @@ const confirm = computed(() => {
   if (state.value.status !== SCAN_STATE.RESULT || match?.status !== MATCH_STATUS.NEEDS_CONFIRMATION) return null
   const clues = state.value.clues
   const lead = match.leader === true && match.candidates[0] ? cardOf(match.candidates[0]) : null
+  // Same-number multi-set groups (OP12-020 ST-32 vs Learn Together) never get
+  // a lead — set/product must be chosen explicitly, so the set is emphasized.
+  const setChoice = match.setChoice === true
   const readNumbers = (clues?.identifiers ?? []).filter((item) => item.query).map((item) => item.raw ?? item.query)
   const cardCount = new Set(match.candidates.map(cardOf)).size
   // Printings that share the number read (alternate art, manga, SP, reprints…)
@@ -165,33 +171,46 @@ const confirm = computed(() => {
   const printingChoice = !match.leader && printings > 1
   const nm = numbered.map((item) => item.card.pricing?.NM?.reference_cents).filter((cents): cents is number => Number.isSafeInteger(cents))
   const unpriced = numbered.length - nm.length
-  const valueRange = nm.length > 1 && Math.max(...nm) > Math.min(...nm) ? `their Near Mint market references range from ${formatMoney(Math.min(...nm))} to ${formatMoney(Math.max(...nm))}` : 'they can differ in value'
+  const hasRange = nm.length > 1 && Math.max(...nm) > Math.min(...nm)
+  const valueRange = hasRange ? `their Near Mint market references range from ${formatMoney(Math.min(...nm))} to ${formatMoney(Math.max(...nm))}` : 'they can differ in value'
   const numbers = readNumbers.join(', ')
+  // needsNumber is about missing collector-number evidence; the title must
+  // match what is actually listed (never "several" for one row).
+  const askForNumber = match.needsNumber === true || (cardCount >= 1 && !readNumbers.length && !numbered.length && (cardCount > 1 || (match.moreCards ?? 0) > 0))
+  const setCount = match.setCount || numbered.length
   const title = match.checkNumber
     ? 'The name and number we read point to different cards.'
-    : match.needsNumber
-      ? 'Several cards match the name. Which one is yours?'
-      : printingChoice
-        ? `${printings} printings share this number. Which one is yours?`
-        : match.candidates.length > 1
-          ? 'Which card is in your hand?'
-          : 'Is this your card?'
+    : setChoice
+      ? `${setCount} sets share this number. Which set and printing is yours?`
+      : askForNumber && cardCount > 1
+        ? 'Several cards match the name. Which one is yours?'
+        : askForNumber && cardCount === 1
+          ? 'We need the card number to confirm this printing.'
+          : printingChoice
+            ? `${printings} printings share this number. Which one is yours?`
+            : match.candidates.length > 1
+              ? 'Which card is in your hand?'
+              : 'Is this your card?'
   const notes = [
-    printingChoice ? `They print the same name and number but differ in artwork, and ${valueRange}${unpriced ? ` (${unpriced} with no online price)` : ''}. Compare the artwork, set and label (e.g. Alternate Art, Manga, SP) with your card. The shop checks the printing in person.` : '',
+    setChoice
+      ? `One Piece reprints keep the same collector number across starter decks, Learn Together products, parallels and promos. Check the set or product name on each row (not just the number) — prices differ${hasRange ? ` (${valueRange})` : ''}. The shop confirms set and printing in person.`
+      : printingChoice
+        ? `They print the same name and number but differ in artwork, and ${valueRange}${unpriced ? ` (${unpriced} with no online price)` : ''}. Compare the artwork, set and label (e.g. Alternate Art, Manga, SP) with your card. The shop checks the printing in person.`
+        : '',
     match.checkNumber
       ? clues?.corrected
         ? `Check the name and number (${numbers}) printed on your card and correct them below.`
         : `We may have misread the number (${numbers}). Check the name and number printed on your card and correct them below if they differ.`
-      : match.needsNumber
+      : askForNumber
         ? readNumbers.length
           ? `The number we read (${numbers}) doesn't match any of these cards. Check the number printed at the bottom of your card and type it below, or compare the set and number of each match.`
-          : "We read the name but not the card number, so we can't tell which set your card is from. Type the number printed at the bottom of your card (e.g. 43/64) below, or compare the set and number of each match."
+          : "We read the name but not the card number, so we can't tell which set or printing this is. Type the number at the bottom of your card (e.g. OP02-030 or 43/64) below — that finds parallels and alternate arts the name alone cannot."
         : match.numberOnly && !clues?.corrected
           ? `Matched only by the number we read (${numbers}); we could not read the name. Check that the name and number match your card.`
           : '',
   ].filter(Boolean)
-  const more = (match.moreCards ?? 0) > 0 ? (numbered.length ? `${match.moreCards} more cards with a different number are not shown.` : `Showing ${cardCount} matching cards; ${match.moreCards} more match. Add the card number to narrow it down.`) : ''
-  return { lead, title, notes, more }
+  const more = (match.moreCards ?? 0) > 0 ? (numbered.length ? `${match.moreCards} more cards with a different number are not shown.` : `Showing ${cardCount} matching cards; ${match.moreCards} more match. Type the card number to reach other printings (including alternate arts).`) : ''
+  return { lead, setChoice, askForNumber, title, notes, more }
 })
 const isLead = (item: Candidate, index: number) => (confirm.value ? confirm.value.lead !== null && cardOf(item) === confirm.value.lead : index === 0)
 function conflicts(item: Candidate) {
@@ -201,8 +220,18 @@ function conflicts(item: Candidate) {
   ].filter(Boolean)
 }
 
-function candidateLine(card: ScanCard) {
-  return [card.set_name, card.card_number, card.printing, card.language && card.language !== 'English' ? card.language : null].filter(Boolean).join(' · ') || 'Set not listed'
+// A scan identifies the card, never its printing: the character name carries
+// the identity and the set/product carries the reprint (ST-32 vs Learn
+// Together vs Parallel). Catalog-only tags are dropped from the title and
+// shown as variant labels; the printing line keeps number, printing, rarity.
+function candidateTitle(card: ScanCard) {
+  return printedName(card.name) || card.name
+}
+function candidateVariants(card: ScanCard): string[] {
+  return variantLabels(card.name)
+}
+function printingLine(card: ScanCard) {
+  return [card.card_number, card.printing, card.rarity, card.language && card.language !== 'English' ? card.language : null].filter(Boolean).join(' · ') || 'Printing not listed'
 }
 function close() {
   emit('close')
@@ -296,9 +325,11 @@ function onKeydown(event: KeyboardEvent) {
           <ul class="mt-2 grid gap-2" role="list">
             <li v-for="(item, index) in state.match.candidates" :key="item.card.id" class="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between" :class="isLead(item, index) ? 'border-nc-red bg-nc-char' : 'border-white/15'" data-scan-candidate>
               <div class="min-w-0">
-                <strong class="block text-lg break-words">{{ item.card.name }}</strong>
-                <span class="block text-sm break-words text-nc-mist">{{ candidateLine(item.card) }}</span>
-                <small class="block text-xs text-white/50">{{ [gameLabel(item.game), item.card.rarity].filter(Boolean).join(' · ') }}</small>
+                <strong class="block text-lg break-words">{{ candidateTitle(item.card) }}</strong>
+                <span v-if="candidateVariants(item.card).length" class="block text-sm break-words text-nc-red-bright">{{ candidateVariants(item.card).join(' · ') }}</span>
+                <span class="block text-sm break-words" :class="confirm?.setChoice ? 'font-semibold text-white' : 'text-nc-mist'">{{ item.card.set_name || 'Set not listed' }}</span>
+                <span class="block text-sm break-words text-nc-mist">{{ printingLine(item.card) }}</span>
+                <small v-if="gameLabel(item.game)" class="block text-xs text-white/50">{{ gameLabel(item.game) }}</small>
                 <small v-for="line in conflicts(item)" :key="line" class="block text-xs text-white/50">{{ line }}</small>
               </div>
               <AdminButton :variant="isLead(item, index) ? 'red' : 'white'" size="sm" @click="emit('confirm', item.card)">Use this card</AdminButton>
